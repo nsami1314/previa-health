@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 
 export default async function DashboardPage() {
@@ -11,7 +12,7 @@ export default async function DashboardPage() {
     {
       title: "Health Profile",
       description: "Your basic health information and personal health history.",
-    },
+      href: "/dashboard/health-profile",    },
     {
       title: "Medical Reports",
       description: "Upload and organize your medical reports in one place.",
@@ -63,12 +64,12 @@ export default async function DashboardPage() {
                 {section.description}
               </p>
 
-              <button
-                type="button"
-                className="mt-5 text-sm font-medium text-teal-700"
-              >
-                Open →
-              </button>
+              <Link
+  href={section.href || "#"}
+  className="mt-5 inline-block text-sm font-medium text-teal-700"
+>
+  Open →
+</Link>
             </div>
           ))}
         </div>
