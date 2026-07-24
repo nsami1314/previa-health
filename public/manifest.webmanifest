@@ -1,0 +1,17 @@
+{
+  "name": "Previa Health",
+  "short_name": "Previa",
+  "description": "Your Lifelong AI Health Companion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
