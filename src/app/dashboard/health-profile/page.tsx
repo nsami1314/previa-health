@@ -1,4 +1,47 @@
+"use client";
+import { useState } from "react";
+import { createSupabaseClient } from "@/lib/supabase";
+import { useAuth, useUser } from "@clerk/nextjs";
 export default function HealthProfilePage() {
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const [dateOfBirth, setDateOfBirth] = useState("");
+const [biologicalSex, setBiologicalSex] = useState("");
+const [heightCm, setHeightCm] = useState("");
+const [weightKg, setWeightKg] = useState("");
+const [bloodGroup, setBloodGroup] = useState("");
+async function saveHealthProfile() {
+
+
+  if (!user) return;
+  const token = await getToken();
+
+const supabase = createSupabaseClient(token);
+
+  const { error } = await supabase.from("health_profiles").upsert({
+    user_id: user.id,
+    date_of_birth: dateOfBirth || null,
+    biological_sex: biologicalSex || null,
+    height_cm: heightCm ? Number(heightCm) : null,
+    weight_kg: weightKg ? Number(weightKg) : null,
+    blood_group: bloodGroup || null,
+  }, {
+    onConflict: "user_id",
+  });
+
+  if (error) {
+    alert(
+      `Supabase error:
+    Message: ${error.message}
+    Code: ${error.code}
+    Details: ${error.details}
+    Hint: ${error.hint}`
+    );
+    return;
+  }
+
+  alert("Health profile saved successfully.");
+}
     return (
       <main className="min-h-screen bg-zinc-50 px-6 py-10">
         <div className="mx-auto max-w-3xl">
@@ -23,6 +66,8 @@ export default function HealthProfilePage() {
                 </label>
                 <input
                   type="date"
+                  value={dateOfBirth}
+onChange={(e) => setDateOfBirth(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
                 />
               </div>
@@ -31,7 +76,10 @@ export default function HealthProfilePage() {
                 <label className="text-sm font-medium text-zinc-700">
                   Biological Sex
                 </label>
-                <select className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2">
+                <select 
+                value={biologicalSex}
+                onChange={(e) => setBiologicalSex(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2">
                   <option value="">Select</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -45,6 +93,8 @@ export default function HealthProfilePage() {
                 <input
                   type="number"
                   placeholder="e.g. 172"
+                  value={heightCm}
+onChange={(e) => setHeightCm(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
                 />
               </div>
@@ -56,6 +106,8 @@ export default function HealthProfilePage() {
                 <input
                   type="number"
                   placeholder="e.g. 70"
+                  value={weightKg}
+onChange={(e) => setWeightKg(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
                 />
               </div>
@@ -64,7 +116,10 @@ export default function HealthProfilePage() {
                 <label className="text-sm font-medium text-zinc-700">
                   Blood Group
                 </label>
-                <select className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2">
+                <select 
+                value={bloodGroup}
+                onChange={(e) => setBloodGroup(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2">
                   <option value="">Select</option>
                   <option>A+</option>
                   <option>A-</option>
@@ -80,6 +135,7 @@ export default function HealthProfilePage() {
   
             <button
               type="button"
+              onClick={saveHealthProfile}
               className="mt-8 rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-medium text-white"
             >
               Save Health Profile
