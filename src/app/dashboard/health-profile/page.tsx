@@ -10,6 +10,7 @@ const [biologicalSex, setBiologicalSex] = useState("");
 const [heightCm, setHeightCm] = useState("");
 const [weightKg, setWeightKg] = useState("");
 const [bloodGroup, setBloodGroup] = useState("");
+const [medicalConditions, setMedicalConditions] = useState("");
 useEffect(() => {
   async function loadHealthProfile() {
     if (!user) return;
@@ -30,6 +31,7 @@ useEffect(() => {
     setHeightCm(data.height_cm?.toString() ?? "");
     setWeightKg(data.weight_kg?.toString() ?? "");
     setBloodGroup(data.blood_group ?? "");
+    setMedicalConditions(data.medical_conditions ?? "");
   }
 
   loadHealthProfile();
@@ -49,6 +51,7 @@ const supabase = createSupabaseClient(token);
     height_cm: heightCm ? Number(heightCm) : null,
     weight_kg: weightKg ? Number(weightKg) : null,
     blood_group: bloodGroup || null,
+    medical_conditions: medicalConditions || null,
   }, {
     onConflict: "user_id",
   });
@@ -155,6 +158,19 @@ onChange={(e) => setWeightKg(e.target.value)}
                   <option>O-</option>
                 </select>
               </div>
+              <div className="sm:col-span-2">
+  <label className="text-sm font-medium text-zinc-700">
+    Medical Conditions
+  </label>
+
+  <textarea
+    rows={4}
+    placeholder="e.g. Diabetes, Hypertension, Asthma"
+    value={medicalConditions}
+    onChange={(e) => setMedicalConditions(e.target.value)}
+    className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+  />
+</div>
             </div>
   
             <button
