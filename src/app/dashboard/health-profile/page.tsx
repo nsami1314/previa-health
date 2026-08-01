@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase";
 import { useAuth, useUser } from "@clerk/nextjs";
 export default function HealthProfilePage() {
@@ -10,6 +10,30 @@ const [biologicalSex, setBiologicalSex] = useState("");
 const [heightCm, setHeightCm] = useState("");
 const [weightKg, setWeightKg] = useState("");
 const [bloodGroup, setBloodGroup] = useState("");
+useEffect(() => {
+  async function loadHealthProfile() {
+    if (!user) return;
+
+    const token = await getToken();
+    const supabase = createSupabaseClient(token);
+
+    const { data, error } = await supabase
+      .from("health_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) return;
+
+    setDateOfBirth(data.date_of_birth ?? "");
+    setBiologicalSex(data.biological_sex ?? "");
+    setHeightCm(data.height_cm?.toString() ?? "");
+    setWeightKg(data.weight_kg?.toString() ?? "");
+    setBloodGroup(data.blood_group ?? "");
+  }
+
+  loadHealthProfile();
+}, [user, getToken]);
 async function saveHealthProfile() {
 
 
