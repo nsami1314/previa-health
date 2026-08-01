@@ -11,6 +11,7 @@ const [heightCm, setHeightCm] = useState("");
 const [weightKg, setWeightKg] = useState("");
 const [bloodGroup, setBloodGroup] = useState("");
 const [medicalConditions, setMedicalConditions] = useState("");
+const [allergies, setAllergies] = useState("");
 useEffect(() => {
   async function loadHealthProfile() {
     if (!user) return;
@@ -32,6 +33,7 @@ useEffect(() => {
     setWeightKg(data.weight_kg?.toString() ?? "");
     setBloodGroup(data.blood_group ?? "");
     setMedicalConditions(data.medical_conditions ?? "");
+    setAllergies(data.allergies ?? "");
   }
 
   loadHealthProfile();
@@ -52,6 +54,7 @@ const supabase = createSupabaseClient(token);
     weight_kg: weightKg ? Number(weightKg) : null,
     blood_group: bloodGroup || null,
     medical_conditions: medicalConditions || null,
+    allergies: allergies || null,
   }, {
     onConflict: "user_id",
   });
@@ -86,6 +89,13 @@ const supabase = createSupabaseClient(token);
           </div>
   
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-zinc-900">
+  Basic Information
+</h2>
+
+<p className="mt-1 mb-6 text-sm text-zinc-600">
+  Tell us about your basic health profile.
+</p>
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium text-zinc-700">
@@ -168,6 +178,19 @@ onChange={(e) => setWeightKg(e.target.value)}
     placeholder="e.g. Diabetes, Hypertension, Asthma"
     value={medicalConditions}
     onChange={(e) => setMedicalConditions(e.target.value)}
+    className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+  />
+</div>
+<div className="sm:col-span-2">
+  <label className="text-sm font-medium text-zinc-700">
+    Allergies
+  </label>
+
+  <textarea
+    rows={3}
+    placeholder="e.g. Penicillin, Peanuts, Dust"
+    value={allergies}
+    onChange={(e) => setAllergies(e.target.value)}
     className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
   />
 </div>
