@@ -1,0 +1,113 @@
+"use client";
+import { useState } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { createSupabaseClient } from "@/lib/supabase";
+import { v4 as uuidv4 } from "uuid";
+
+export default function MedicalReportsPage() {
+    const { getToken } = useAuth();
+    const { user } = useUser();
+
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    async function uploadReport() {
+        if (!selectedFile) {
+          alert("Please select a file first.");
+          return;
+        }
+      
+        const token = await getToken();
+      
+        if (!token) {
+          alert("You are not authenticated.");
+          return;
+        }
+      
+        const supabase = createSupabaseClient(token);
+      
+        const fileExtension = selectedFile.name.split(".").pop();
+        const fileName = `${uuidv4()}.${fileExtension}`;
+      
+        const { error } = await supabase.storage
+          .from("medical-reports")
+          .upload(fileName, selectedFile);
+      
+          if (error) {
+            alert(`Upload failed: ${error.message}`);
+            return;
+          }
+          
+          if (!user) {
+            alert("User not found.");
+            return;
+          }
+          
+          const { error: dbError } = await supabase
+            .from("medical_reports")
+            .insert({
+              user_id: user.id,
+              original_file_name: selectedFile.name,
+              file_name: fileName,
+              file_path: fileName,
+            });
+          
+          if (dbError) {
+            alert(`Database error: ${dbError.message}`);
+            return;
+          }
+          
+          alert("File uploaded and saved successfully.");
+      }
+  return (
+    <main className="min-h-screen bg-zinc-50 px-6 py-10">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8">
+          <p className="text-sm font-medium text-teal-700">
+            Previa Health
+          </p>
+
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
+            Medical Reports
+          </h1>
+
+          <p className="mt-3 text-zinc-600">
+            Upload and securely store your medical reports,
+            prescriptions, scans and lab results.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+  <label className="block text-sm font-medium text-zinc-700">
+    Select Medical Report
+  </label>
+
+  <input
+    type="file"
+    accept=".pdf,.jpg,.jpeg,.png"
+    onChange={(e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        setSelectedFile(e.target.files[0]);
+      }
+    }}
+    className="mt-3 block w-full text-sm"
+  />
+
+{selectedFile && (
+  <div className="mt-4 rounded-lg bg-zinc-100 p-3">
+    <p className="text-sm text-zinc-700">
+      Selected file: <strong>{selectedFile.name}</strong>
+    </p>
+
+    <button
+  type="button"
+  onClick={uploadReport}
+  className="mt-4 rounded-lg bg-teal-700 px-5 py-2 text-sm font-medium text-white"
+>
+  Upload Report
+</button>
+  </div>
+)}
+</div>
+      </div>
+    </main>
+  );
+}
