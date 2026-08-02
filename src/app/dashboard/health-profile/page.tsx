@@ -14,6 +14,7 @@ const [medicalConditions, setMedicalConditions] = useState("");
 const [allergies, setAllergies] = useState("");
 const [currentMedications, setCurrentMedications] = useState("");
 const [pastSurgeries, setPastSurgeries] = useState(""); 
+const [familyMedicalHistory, setFamilyMedicalHistory] = useState("");
 useEffect(() => {
   async function loadHealthProfile() {
     if (!user) return;
@@ -38,6 +39,7 @@ useEffect(() => {
     setAllergies(data.allergies ?? "");
     setCurrentMedications(data.current_medications ?? "");
     setPastSurgeries(data.past_surgeries ?? "");
+    setFamilyMedicalHistory(data.family_medical_history ?? "");
   }
 
   loadHealthProfile();
@@ -61,6 +63,7 @@ const supabase = createSupabaseClient(token);
     allergies: allergies || null,
     current_medications: currentMedications || null,
     past_surgeries: pastSurgeries || null,
+    family_medical_history: familyMedicalHistory || null,
   }, {
     onConflict: "user_id",
   });
@@ -223,6 +226,19 @@ onChange={(e) => setWeightKg(e.target.value)}
     placeholder="e.g. Appendix removal (2018), Cataract surgery (2022)"
     value={pastSurgeries}
     onChange={(e) => setPastSurgeries(e.target.value)}
+    className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+  />
+</div>
+<div className="sm:col-span-2">
+  <label className="text-sm font-medium text-zinc-700">
+    Family Medical History
+  </label>
+
+  <textarea
+    rows={4}
+    placeholder="e.g. Father: Diabetes, Mother: Hypertension, Grandfather: Heart disease"
+    value={familyMedicalHistory}
+    onChange={(e) => setFamilyMedicalHistory(e.target.value)}
     className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
   />
 </div>
