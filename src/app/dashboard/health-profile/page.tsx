@@ -13,6 +13,7 @@ const [bloodGroup, setBloodGroup] = useState("");
 const [medicalConditions, setMedicalConditions] = useState("");
 const [allergies, setAllergies] = useState("");
 const [currentMedications, setCurrentMedications] = useState("");
+const [pastSurgeries, setPastSurgeries] = useState(""); 
 useEffect(() => {
   async function loadHealthProfile() {
     if (!user) return;
@@ -36,6 +37,7 @@ useEffect(() => {
     setMedicalConditions(data.medical_conditions ?? "");
     setAllergies(data.allergies ?? "");
     setCurrentMedications(data.current_medications ?? "");
+    setPastSurgeries(data.past_surgeries ?? "");
   }
 
   loadHealthProfile();
@@ -58,6 +60,7 @@ const supabase = createSupabaseClient(token);
     medical_conditions: medicalConditions || null,
     allergies: allergies || null,
     current_medications: currentMedications || null,
+    past_surgeries: pastSurgeries || null,
   }, {
     onConflict: "user_id",
   });
@@ -207,6 +210,19 @@ onChange={(e) => setWeightKg(e.target.value)}
     placeholder="e.g. Metformin 500 mg twice daily, Telmisartan 40 mg once daily"
     value={currentMedications}
     onChange={(e) => setCurrentMedications(e.target.value)}
+    className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+  />
+</div>
+<div className="sm:col-span-2">
+  <label className="text-sm font-medium text-zinc-700">
+    Past Surgeries / Procedures
+  </label>
+
+  <textarea
+    rows={4}
+    placeholder="e.g. Appendix removal (2018), Cataract surgery (2022)"
+    value={pastSurgeries}
+    onChange={(e) => setPastSurgeries(e.target.value)}
     className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
   />
 </div>
