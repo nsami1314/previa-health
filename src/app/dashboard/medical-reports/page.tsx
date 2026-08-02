@@ -71,7 +71,7 @@ export default function MedicalReportsPage() {
               user_id: user.id,
               original_file_name: selectedFile.name,
               file_name: fileName,
-              file_path: fileName,
+              file_path: `/${fileName}`,
             });
           
           if (dbError) {

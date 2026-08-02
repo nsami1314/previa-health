@@ -16,10 +16,12 @@ export default async function DashboardPage() {
     {
       title: "Medical Reports",
       description: "Upload and organize your medical reports in one place.",
+      href: "/dashboard/medical-reports",
     },
     {
       title: "Medications",
       description: "Keep track of your current and past medications.",
+      href: "/dashboard/medications",
     },
     {
       title: "Health Conditions",
