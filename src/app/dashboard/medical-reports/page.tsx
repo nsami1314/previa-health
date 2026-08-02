@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createSupabaseClient } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
@@ -9,6 +9,30 @@ export default function MedicalReportsPage() {
     const { user } = useUser();
 
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [reports, setReports] = useState<any[]>([]);
+    useEffect(() => {
+      async function loadReports() {
+        if (!user) return;
+    
+        const token = await getToken();
+        const supabase = createSupabaseClient(token);
+    
+        const { data, error } = await supabase
+          .from("medical_reports")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("uploaded_at", { ascending: false });
+    
+        if (error) {
+          console.error(error);
+          return;
+        }
+    
+        setReports(data ?? []);
+      }
+    
+      loadReports();
+    }, [user, getToken]);
     async function uploadReport() {
         if (!selectedFile) {
           alert("Please select a file first.");
@@ -104,6 +128,31 @@ export default function MedicalReportsPage() {
 >
   Upload Report
 </button>
+  </div>
+)}
+{reports.length > 0 && (
+  <div className="mt-8">
+    <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+      Your Reports
+    </h2>
+
+    <div className="space-y-3">
+      {reports.map((report) => (
+        <div
+          key={report.id}
+          className="rounded-lg border border-zinc-200 p-4"
+        >
+          <p className="font-medium">
+            {report.original_file_name}
+          </p>
+
+          <p className="mt-1 text-sm text-zinc-500">
+            Uploaded:{" "}
+            {new Date(report.uploaded_at).toLocaleString()}
+          </p>
+        </div>
+      ))}
+    </div>
   </div>
 )}
 </div>
