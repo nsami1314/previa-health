@@ -1,3 +1,4 @@
+import { analyzeMedicalReport } from "@/lib/ai/openai";
 import { extractTextFromPDF } from "@/lib/ai/parser";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -61,11 +62,21 @@ console.log("PDF TEXT PREVIEW");
 console.log("====================================");
 console.log(extractedText.substring(0, 1500));
 console.log("====================================");
+console.log("Sending report to OpenAI...");
 
-    return NextResponse.json({
-      success: true,
-      report,
-    });
+const aiResult = await analyzeMedicalReport(extractedText);
+
+console.log("====================================");
+console.log("AI RESPONSE");
+console.log("====================================");
+console.log(aiResult);
+console.log("====================================");
+
+return NextResponse.json({
+  success: true,
+  report,
+  aiResult,
+});
   } catch (err) {
     console.error(err);
 

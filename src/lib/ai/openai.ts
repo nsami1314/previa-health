@@ -1,17 +1,31 @@
 import OpenAI from "openai";
+import { REPORT_ANALYSIS_PROMPT } from "./prompts";
 
-let client: OpenAI | null = null;
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured.");
-  }
+export async function analyzeMedicalReport(reportText: string) {
+  const response = await openai.responses.create({
+    model: "gpt-5",
 
-  if (!client) {
-    client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
+    input: [
+      {
+        role: "system",
+        content: REPORT_ANALYSIS_PROMPT,
+      },
+      {
+        role: "user",
+        content: reportText,
+      },
+    ],
 
-  return client;
+    text: {
+      format: {
+        type: "json_object",
+      },
+    },
+  });
+
+  return response.output_text;
 }
