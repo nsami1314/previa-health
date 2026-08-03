@@ -65,23 +65,58 @@ export default function MedicalReportsPage() {
             return;
           }
           
-          const { error: dbError } = await supabase
-            .from("medical_reports")
-            .insert({
-              user_id: user.id,
-              original_file_name: selectedFile.name,
-              file_name: fileName,
-              file_path: `/${fileName}`,
-            });
-          
-          if (dbError) {
-            alert(`Database error: ${dbError.message}`);
-            return;
-          }
-          
-          alert("File uploaded and saved successfully.");
-      }
-  return (
+          const { data: reportData, error: dbError } = await supabase
+  .from("medical_reports")
+  .insert({
+    user_id: user.id,
+    original_file_name: selectedFile.name,
+    file_name: fileName,
+    file_path: `/${fileName}`,
+  })
+  .select()
+  .single();
+
+if (dbError) {
+  alert(`Database error: ${dbError.message}`);
+  return;
+}
+
+const { error: analysisError } = await supabase
+  .from("report_analysis")
+  .insert({
+    report_id: reportData.id,
+    user_id: user.id,
+    status: "pending",
+  });
+
+  if (analysisError) {
+    console.log("Analysis Error:", analysisError);
+  
+    alert(
+  `Message: ${analysisError.message}
+  Code: ${analysisError.code}
+  Details: ${analysisError.details}
+  Hint: ${analysisError.hint}`
+    );
+  
+    return;
+  }
+
+alert("Report uploaded successfully and queued for AI analysis.");
+
+setSelectedFile(null);
+
+// Reload reports list so the new upload appears immediately
+const { data: refreshedReports } = await supabase
+  .from("medical_reports")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("uploaded_at", { ascending: false });
+
+setReports(refreshedReports ?? []);
+}
+
+return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10">
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
