@@ -15,6 +15,11 @@ const [allergies, setAllergies] = useState("");
 const [currentMedications, setCurrentMedications] = useState("");
 const [pastSurgeries, setPastSurgeries] = useState(""); 
 const [familyMedicalHistory, setFamilyMedicalHistory] = useState("");
+const [smokingStatus, setSmokingStatus] = useState("");
+const [alcoholConsumption, setAlcoholConsumption] = useState("");
+const [exerciseFrequency, setExerciseFrequency] = useState("");
+const [dietPreference, setDietPreference] = useState("");
+const [sleepDuration, setSleepDuration] = useState("");
 useEffect(() => {
   async function loadHealthProfile() {
     if (!user) return;
@@ -40,6 +45,11 @@ useEffect(() => {
     setCurrentMedications(data.current_medications ?? "");
     setPastSurgeries(data.past_surgeries ?? "");
     setFamilyMedicalHistory(data.family_medical_history ?? "");
+    setSmokingStatus(data.smoking_status ?? "");
+setAlcoholConsumption(data.alcohol_consumption ?? "");
+setExerciseFrequency(data.exercise_frequency ?? "");
+setDietPreference(data.diet_preference ?? "");
+setSleepDuration(data.sleep_duration ?? "");
   }
 
   loadHealthProfile();
@@ -64,6 +74,11 @@ const supabase = createSupabaseClient(token);
     current_medications: currentMedications || null,
     past_surgeries: pastSurgeries || null,
     family_medical_history: familyMedicalHistory || null,
+    smoking_status: smokingStatus || null,
+alcohol_consumption: alcoholConsumption || null,
+exercise_frequency: exerciseFrequency || null,
+diet_preference: dietPreference || null,
+sleep_duration: sleepDuration || null,
   }, {
     onConflict: "user_id",
   });
@@ -241,6 +256,106 @@ onChange={(e) => setWeightKg(e.target.value)}
     onChange={(e) => setFamilyMedicalHistory(e.target.value)}
     className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
   />
+</div>
+<div className="mt-10 border-t border-zinc-200 pt-8">
+  <h2 className="text-xl font-semibold text-zinc-900">
+    Lifestyle
+  </h2>
+
+  <p className="mt-1 mb-6 text-sm text-zinc-600">
+    Help us understand your daily lifestyle habits.
+  </p>
+
+  <div className="grid gap-6 sm:grid-cols-2">
+
+    <div>
+      <label className="text-sm font-medium text-zinc-700">
+        Smoking Status
+      </label>
+
+      <select
+        value={smokingStatus}
+        onChange={(e) => setSmokingStatus(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+      >
+        <option value="">Select</option>
+        <option value="Never">Never</option>
+        <option value="Former">Former Smoker</option>
+        <option value="Occasionally">Occasionally</option>
+        <option value="Daily">Daily</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium text-zinc-700">
+        Alcohol Consumption
+      </label>
+
+      <select
+        value={alcoholConsumption}
+        onChange={(e) => setAlcoholConsumption(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+      >
+        <option value="">Select</option>
+        <option value="Never">Never</option>
+        <option value="Occasionally">Occasionally</option>
+        <option value="Weekly">Weekly</option>
+        <option value="Daily">Daily</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium text-zinc-700">
+        Exercise Frequency
+      </label>
+
+      <select
+        value={exerciseFrequency}
+        onChange={(e) => setExerciseFrequency(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+      >
+        <option value="">Select</option>
+        <option value="Never">Never</option>
+        <option value="1-2 days/week">1–2 days/week</option>
+        <option value="3-5 days/week">3–5 days/week</option>
+        <option value="Daily">Daily</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium text-zinc-700">
+        Diet Preference
+      </label>
+
+      <select
+        value={dietPreference}
+        onChange={(e) => setDietPreference(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+      >
+        <option value="">Select</option>
+        <option value="Vegetarian">Vegetarian</option>
+        <option value="Vegan">Vegan</option>
+        <option value="Eggetarian">Eggetarian</option>
+        <option value="Non-Vegetarian">Non-Vegetarian</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium text-zinc-700">
+        Average Sleep Duration
+      </label>
+
+      <input
+        type="text"
+        placeholder="e.g. 7 hours"
+        value={sleepDuration}
+        onChange={(e) => setSleepDuration(e.target.value)}
+        className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2"
+      />
+    </div>
+
+  </div>
 </div>
             </div>
   
