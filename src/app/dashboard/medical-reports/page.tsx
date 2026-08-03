@@ -102,11 +102,28 @@ const { error: analysisError } = await supabase
     return;
   }
 
+// Call AI processing endpoint
+console.log("Report Data:", reportData);
+console.log("Report ID:", reportData?.id);
+const aiResponse = await fetch("/api/ai/process-report", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    reportId: reportData.id,
+  }),
+});
+
+const aiResult = await aiResponse.json();
+
+console.log("AI API Response:", aiResult);
+
 alert("Report uploaded successfully and queued for AI analysis.");
 
 setSelectedFile(null);
 
-// Reload reports list so the new upload appears immediately
+// Reload reports list
 const { data: refreshedReports } = await supabase
   .from("medical_reports")
   .select("*")
@@ -114,6 +131,7 @@ const { data: refreshedReports } = await supabase
   .order("uploaded_at", { ascending: false });
 
 setReports(refreshedReports ?? []);
+
 }
 
 return (
