@@ -1,3 +1,4 @@
+import { extractTextFromPDF } from "@/lib/ai/parser";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -51,6 +52,15 @@ if (downloadError || !pdfFile) {
 }
 
 console.log("PDF Size:", pdfFile.size);
+const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
+
+const extractedText = await extractTextFromPDF(pdfBuffer);
+
+console.log("====================================");
+console.log("PDF TEXT PREVIEW");
+console.log("====================================");
+console.log(extractedText.substring(0, 1500));
+console.log("====================================");
 
     return NextResponse.json({
       success: true,
