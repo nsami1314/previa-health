@@ -1,3 +1,4 @@
+import { DocumentEngine } from "@/lib/document-engine";
 import { analyzeMedicalReport } from "@/lib/ai/openai";
 import { extractTextFromPDF } from "@/lib/ai/parser";
 import { NextResponse } from "next/server";
@@ -5,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: Request) {
   try {
+    const documentEngine = new DocumentEngine();
     console.log("=== AI ROUTE HIT ===");
 
     const { reportId } = await req.json();
@@ -57,11 +59,41 @@ const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
 
 const extractedText = await extractTextFromPDF(pdfBuffer);
 
+const engineFile = new File(
+  [pdfBuffer],
+  report.file_name,
+  {
+    type: "application/pdf",
+  }
+);
+
+const parsedDocument =
+  await documentEngine.process(engineFile);
+
+console.log("====================================");
+console.log("DOCUMENT ENGINE OUTPUT");
+console.log("====================================");
+console.log(parsedDocument.text.substring(0, 1500));
+console.log("====================================");
+
 console.log("====================================");
 console.log("PDF TEXT PREVIEW");
 console.log("====================================");
 console.log(extractedText.substring(0, 1500));
 console.log("====================================");
+const { error: saveTextError } = await supabaseAdmin
+  .from("report_analysis")
+  .update({
+    extracted_text: extractedText,
+    status: "text_extracted",
+  })
+  .eq("report_id", report.id);
+
+if (saveTextError) {
+  console.error("Failed to save extracted text:", saveTextError);
+} else {
+  console.log("Extracted text saved successfully.");
+}
 console.log("Sending report to OpenAI...");
 
 const aiResult = await analyzeMedicalReport(extractedText);
