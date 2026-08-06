@@ -4,7 +4,17 @@
  * Digital PDF Parser
  */
 
-import { getDocument } from "pdfjs-dist";
+import { PdfRenderer } from "../pdf";
+import { OCREngine } from "../ocr";
+import {
+  getDocument,
+  GlobalWorkerOptions,
+} from "pdfjs-dist/legacy/build/pdf.mjs";
+
+GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/legacy/build/pdf.worker.mjs",
+  import.meta.url
+).toString();
 
 import { DocumentParser } from "./parser";
 import { DocumentEngineLogger } from "../logger";
@@ -35,6 +45,10 @@ function extractTextItems(items: unknown[]): string {
 }
 
 export class PdfParser implements DocumentParser {
+  private readonly renderer = new PdfRenderer();
+
+private readonly ocr = new OCREngine();
+
   supports(file: File): boolean {
     return isPdf(file.type);
   }
@@ -92,6 +106,44 @@ DocumentEngineLogger.info(
   `Total extracted characters: ${combinedText.length}`
 );
 
+const minimumCharacters = 100;
+
+const shouldUseOCR =
+  combinedText.trim().length < minimumCharacters;
+
+  DocumentEngineLogger.info(
+    `OCR required: ${shouldUseOCR}`
+  );
+  
+  if (shouldUseOCR) {
+    DocumentEngineLogger.info(
+      "No selectable text found. Starting OCR fallback..."
+    );
+  
+    const pdfBuffer = Buffer.from(arrayBuffer);
+  
+    const renderedPages =
+      await this.renderer.render(pdfBuffer);
+  
+    DocumentEngineLogger.info(
+      `Rendered ${renderedPages.length} page(s) for OCR`
+    );
+  
+    const firstPage = renderedPages[0];
+
+    const ocrResult =
+      await this.ocr.recognize(firstPage);
+    
+    DocumentEngineLogger.info(
+      `OCR extracted ${ocrResult.text.length} characters`
+    );
+  }
+
+  console.log(
+    "[DocumentEngine] OCR required:",
+    shouldUseOCR
+  );
+
 const metadata: DocumentMetadata = {
   filename: file.name,
   mimeType: file.type,
@@ -106,7 +158,7 @@ return {
   pages,
   text: combinedText.trim(),
   processingTime: 0,
-  ocrUsed: false,
+  ocrUsed: shouldUseOCR,
   warnings: [],
   errors: [],
 };

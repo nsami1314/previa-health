@@ -1,6 +1,5 @@
 import { DocumentEngine } from "@/lib/document-engine";
 import { analyzeMedicalReport } from "@/lib/ai/openai";
-import { extractTextFromPDF } from "@/lib/ai/parser";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -57,24 +56,18 @@ if (downloadError || !pdfFile) {
 console.log("PDF Size:", pdfFile.size);
 const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
 
-const extractedText = await extractTextFromPDF(pdfBuffer);
-
 const engineFile = new File(
   [pdfBuffer],
   report.file_name,
   {
-    type: "application/pdf",
+    type: pdfFile.type,
   }
 );
 
 const parsedDocument =
   await documentEngine.process(engineFile);
 
-console.log("====================================");
-console.log("DOCUMENT ENGINE OUTPUT");
-console.log("====================================");
-console.log(parsedDocument.text.substring(0, 1500));
-console.log("====================================");
+const extractedText = parsedDocument.text;
 
 console.log("====================================");
 console.log("PDF TEXT PREVIEW");
