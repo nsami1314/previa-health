@@ -4,6 +4,8 @@
  * Image Parser (Foundation)
  */
 
+import { OCREngine } from "../ocr";
+import { DocumentEngineLogger } from "../logger";
 import { DocumentParser } from "./parser";
 import {
   ParsedDocument,
@@ -13,6 +15,8 @@ import {
 import { isImage } from "../mime";
 
 export class ImageParser implements DocumentParser {
+  private readonly ocr = new OCREngine();
+
   supports(file: File): boolean {
     return isImage(file.type);
   }
@@ -26,25 +30,36 @@ export class ImageParser implements DocumentParser {
       pageCount: 1,
       language: "unknown",
     };
+    DocumentEngineLogger.info(
+      `Starting OCR for image: ${file.name}`
+    );
+    
+    const imageBuffer = Buffer.from(
+      await file.arrayBuffer()
+    );
+    
+    const ocrResult =
+      await this.ocr.recognize(imageBuffer);
+    
+    DocumentEngineLogger.info(
+      `OCR extracted ${ocrResult.text.length} characters`
+    );
 
     const pages: ParsedPage[] = [
       {
         pageNumber: 1,
-        text: "",
-        confidence: 0,
-        ocrUsed: false,
+        text: ocrResult.text,
+        confidence: ocrResult.confidence,
+        ocrUsed: true,
       },
     ];
-
     return {
       metadata,
       pages,
-      text: "",
+      text: ocrResult.text,
       processingTime: 0,
-      ocrUsed: false,
-      warnings: [
-        "OCR has not been executed yet.",
-      ],
+      ocrUsed: true,
+      warnings: [],
       errors: [],
     };
   }

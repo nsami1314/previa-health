@@ -120,7 +120,9 @@ const shouldUseOCR =
       "No selectable text found. Starting OCR fallback..."
     );
   
-    const pdfBuffer = Buffer.from(arrayBuffer);
+    const pdfBuffer = Buffer.from(
+      await file.arrayBuffer()
+    );
   
     const renderedPages =
       await this.renderer.render(pdfBuffer);
@@ -129,14 +131,30 @@ const shouldUseOCR =
       `Rendered ${renderedPages.length} page(s) for OCR`
     );
   
-    const firstPage = renderedPages[0];
+    let ocrText = "";
 
-    const ocrResult =
-      await this.ocr.recognize(firstPage);
+for (const page of renderedPages) {
+  const ocrResult =
+    await this.ocr.recognize(page);
+
+  ocrText += ocrResult.text + "\n\n";
+
+  DocumentEngineLogger.info(
+    `OCR extracted ${ocrResult.text.length} characters`
+  );
+}
+combinedText = ocrText.trim();
+
+pages.length = 0;
+
+pages.push({
+  pageNumber: 1,
+  text: combinedText,
+  confidence: 75,
+  ocrUsed: true,
+});
+
     
-    DocumentEngineLogger.info(
-      `OCR extracted ${ocrResult.text.length} characters`
-    );
   }
 
   console.log(
