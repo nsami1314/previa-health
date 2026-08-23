@@ -91,6 +91,70 @@ console.log("Sending report to OpenAI...");
 
 const aiResult = await analyzeMedicalReport(extractedText);
 
+const { error: reportTypeError } = await supabaseAdmin
+  .from("medical_reports")
+  .update({
+    report_type: aiResult.report_type ?? "Other",
+  })
+  .eq("id", report.id);
+
+if (reportTypeError) {
+  console.error("Failed to save report type:", reportTypeError);
+} else {
+  console.log("Report type saved:", aiResult.report_type);
+}
+
+const { error: analysisError } = await supabaseAdmin
+  .from("report_analysis")
+  .update({
+    ai_summary: aiResult.summary,
+    ai_response: aiResult,
+    extracted_data: aiResult,
+    status: "completed",
+    processed_at: new Date().toISOString(),
+  })
+  .eq("report_id", report.id);
+
+if (analysisError) {
+  console.error("Failed to save AI analysis:", analysisError);
+} else {
+  console.log("AI analysis saved successfully.");
+}
+
+if (Array.isArray(aiResult.medications) && aiResult.medications.length > 0) {
+
+ console.log("MEDICATION SAVE REPORT ID:", report.id);
+ console.log("MEDICATION SAVE USER ID:", report.user_id);
+
+ const medicationRows = aiResult.medications.map((med: any) => ({
+  report_id: report.id,
+  user_id: report.user_id,
+  medicine_name: med.name ?? "",
+  dosage: med.dosage ?? null,
+  frequency: med.frequency ?? null,
+  notes: med.instructions ?? null,
+  source: "ai",
+  confidence: aiResult.confidence ?? null,
+}));
+
+  const { error: medicationError } = await supabaseAdmin
+    .from("medications")
+    .insert(medicationRows);
+
+  if (medicationError) {
+    console.error("Failed to save medications:", medicationError);
+  } else {
+    console.log(
+      `Saved ${medicationRows.length} medication(s).`
+    );
+  }
+}
+
+console.log("AI RESULT TYPE:", typeof aiResult);
+console.log("AI RESULT:", aiResult);
+console.log("SUMMARY:", aiResult.summary);
+console.log("MEDICATIONS:", aiResult.medications);
+
 console.log("====================================");
 console.log("AI RESPONSE");
 console.log("====================================");

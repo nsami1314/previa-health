@@ -27,5 +27,5 @@ export async function analyzeMedicalReport(reportText: string) {
     },
   });
 
-  return response.output_text;
+  return JSON.parse(response.output_text);
 }
