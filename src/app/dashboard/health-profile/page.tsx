@@ -7,6 +7,8 @@ export default function HealthProfilePage() {
   const { getToken } = useAuth();
   const [dateOfBirth, setDateOfBirth] = useState("");
 const [biologicalSex, setBiologicalSex] = useState("");
+const [profileExists, setProfileExists] = useState(false);
+const [isEditing, setIsEditing] = useState(false);
 const [heightCm, setHeightCm] = useState("");
 const [weightKg, setWeightKg] = useState("");
 const [bloodGroup, setBloodGroup] = useState("");
@@ -33,7 +35,9 @@ useEffect(() => {
       .eq("user_id", user.id)
       .single();
 
-    if (error || !data) return;
+      if (error || !data) return;
+
+      setProfileExists(true);
 
     setDateOfBirth(data.date_of_birth ?? "");
     setBiologicalSex(data.biological_sex ?? "");
@@ -95,6 +99,8 @@ sleep_duration: sleepDuration || null,
   }
 
   alert("Health profile saved successfully.");
+  setProfileExists(true);
+setIsEditing(false);
 }
     return (
       <main className="min-h-screen bg-zinc-50 px-6 py-10">
@@ -102,17 +108,38 @@ sleep_duration: sleepDuration || null,
           <div className="mb-8">
             <p className="text-sm font-medium text-teal-700">Previa Health</p>
   
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-              Health Profile
-            </h1>
+            <div className="flex items-center justify-between gap-4">
+  <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
+    Health Profile
+  </h1>
+
+  {profileExists && (
+    <button
+      type="button"
+      onClick={() => setIsEditing(true)}
+      className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+    >
+      Edit Profile
+    </button>
+  )}
+</div>
   
-            <p className="mt-3 text-zinc-600">
-              Add your basic health information to build your personal health
-              record.
-            </p>
+<div className="mt-4">
+  <p className="text-lg font-semibold text-zinc-900">
+    {user?.fullName || "Your Health Profile"}
+  </p>
+
+  <p className="mt-1 text-sm text-zinc-500">
+    Personal health record
+  </p>
+</div>
           </div>
   
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div
+  className={`rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm ${
+    profileExists && !isEditing ? "hidden" : ""
+  }`}
+>
           <h2 className="text-xl font-semibold text-zinc-900">
   Basic Information
 </h2>
@@ -368,6 +395,139 @@ onChange={(e) => setWeightKg(e.target.value)}
             </button>
           </div>
         </div>
+
+        {profileExists && !isEditing && (
+  <div className="space-y-6">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-900">
+        Basic Information
+      </h2>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div>
+          <p className="text-sm text-zinc-500">Date of Birth</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {dateOfBirth || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Biological Sex</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {biologicalSex || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Height</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {heightCm ? `${heightCm} cm` : "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Weight</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {weightKg ? `${weightKg} kg` : "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Blood Group</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {bloodGroup || "-"}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-900">
+        Health Information
+      </h2>
+
+      <div className="mt-5 space-y-5">
+        <div>
+          <p className="text-sm text-zinc-500">Medical Conditions</p>
+          <p className="mt-1 text-zinc-900">
+            {medicalConditions || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Allergies</p>
+          <p className="mt-1 text-zinc-900">
+            {allergies || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Current Medications</p>
+          <p className="mt-1 text-zinc-900">
+            {currentMedications || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Past Surgeries</p>
+          <p className="mt-1 text-zinc-900">
+            {pastSurgeries || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Family Medical History</p>
+          <p className="mt-1 text-zinc-900">
+            {familyMedicalHistory || "-"}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-900">
+        Lifestyle
+      </h2>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div>
+          <p className="text-sm text-zinc-500">Smoking</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {smokingStatus || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Alcohol</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {alcoholConsumption || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Exercise</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {exerciseFrequency || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Diet</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {dietPreference || "-"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-zinc-500">Sleep</p>
+          <p className="mt-1 font-medium text-zinc-900">
+            {sleepDuration || "-"}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       </main>
     );
   }
