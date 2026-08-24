@@ -16,6 +16,8 @@ export default function MedicationsPage() {
   const [status, setStatus] = useState("Active");
   const [notes, setNotes] = useState("");
   const [medications, setMedications] = useState<any[]>([]);
+  const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
     async function loadMedications() {
       if (!user) return;
@@ -87,6 +89,126 @@ setNotes("");
 
 alert("Medication saved successfully.");
   }
+
+  async function updateMedication() {
+    if (!user || !editingMedicationId) return;
+  
+    if (!medicineName.trim()) {
+      alert("Please enter the medicine name.");
+      return;
+    }
+  
+    const token = await getToken();
+  
+    if (!token) {
+      alert("You are not authenticated.");
+      return;
+    }
+  
+    setSaving(true);
+  
+    const supabase = createSupabaseClient(token);
+  
+    const { error } = await supabase
+      .from("medications")
+      .update({
+        medicine_name: medicineName,
+        dosage: dosage || null,
+        frequency: frequency || null,
+        start_date: startDate || null,
+        end_date: endDate || null,
+        status: status || null,
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", editingMedicationId)
+      .eq("user_id", user.id);
+  
+    setSaving(false);
+  
+    if (error) {
+      alert(`Database error: ${error.message}`);
+      return;
+    }
+  
+    setEditingMedicationId(null);
+  
+    setMedicineName("");
+    setDosage("");
+    setFrequency("");
+    setStartDate("");
+    setEndDate("");
+    setStatus("Active");
+    setNotes("");
+  
+    setMedications((current) =>
+      current.map((medication) =>
+        medication.id === editingMedicationId
+          ? {
+              ...medication,
+              medicine_name: medicineName,
+              dosage: dosage || null,
+              frequency: frequency || null,
+              start_date: startDate || null,
+              end_date: endDate || null,
+              status: status || null,
+              notes: notes || null,
+              updated_at: new Date().toISOString(),
+            }
+          : medication
+      )
+    );
+  
+    alert("Medication updated successfully.");
+  }
+
+  function startEditingMedication(medication: any) {
+    setEditingMedicationId(medication.id);
+    setMedicineName(medication.medicine_name ?? "");
+    setDosage(medication.dosage ?? "");
+    setFrequency(medication.frequency ?? "");
+    setStartDate(medication.start_date ?? "");
+    setEndDate(medication.end_date ?? "");
+    setStatus(medication.status ?? "Active");
+    setNotes(medication.notes ?? "");
+  }
+  
+  async function deleteMedication(medicationId: string) {
+    if (!user) return;
+  
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this medication?"
+    );
+  
+    if (!confirmed) return;
+  
+    const token = await getToken();
+  
+    if (!token) {
+      alert("You are not authenticated.");
+      return;
+    }
+  
+    const supabase = createSupabaseClient(token);
+  
+    const { error } = await supabase
+      .from("medications")
+      .delete()
+      .eq("id", medicationId)
+      .eq("user_id", user.id);
+  
+    if (error) {
+      alert(`Database error: ${error.message}`);
+      return;
+    }
+  
+    setMedications((current) =>
+      current.filter((medication) => medication.id !== medicationId)
+    );
+  
+    alert("Medication deleted successfully.");
+  }
+
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10">
       <div className="mx-auto max-w-4xl">
@@ -207,11 +329,13 @@ alert("Medication saved successfully.");
 
 <button
   type="button"
-  onClick={saveMedication}
-  className="mt-8 rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-medium text-white"
+  onClick={editingMedicationId ? updateMedication : saveMedication}
+  disabled={saving}
+  className="mt-8 rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
 >
-  Save Medication
+  {editingMedicationId ? "Update Medication" : "Save Medication"}
 </button>
+
 {medications.length > 0 && (
   <div className="mt-8">
     <h2 className="mb-4 text-lg font-semibold text-zinc-900">
@@ -239,6 +363,25 @@ alert("Medication saved successfully.");
           <p className="text-sm text-zinc-500">
             Status: {medication.status || "-"}
           </p>
+
+          <div className="mt-3">
+  <button
+    type="button"
+    onClick={() => startEditingMedication(medication)}
+    className="mr-3 text-sm font-medium text-teal-700"
+  >
+    Edit
+  </button>
+
+  <button
+    type="button"
+    onClick={() => deleteMedication(medication.id)}
+    className="text-sm font-medium text-red-600"
+  >
+    Delete
+  </button>
+</div>
+
         </div>
       ))}
     </div>
