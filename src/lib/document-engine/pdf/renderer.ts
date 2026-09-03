@@ -2,7 +2,8 @@
  * Previa Health
  * PDF Renderer
  *
- * Renders scanned PDF pages into PNG buffers for OCR.
+ * Renders scanned PDF pages into PNG buffers for OCR
+ * and visual AI analysis.
  */
 
 import type { RenderParameters } from "pdfjs-dist/types/src/display/api";
@@ -19,50 +20,64 @@ export class PdfRenderer {
     _pdfBuffer: Buffer,
     options: PdfRenderOptions = {}
   ): Promise<Buffer[]> {
+    const scale = options.scale ?? 3;
+
     DocumentEngineLogger.info(
-      `Rendering PDF pages (scale=${options.scale ?? 3})`
+      `Rendering PDF pages (scale=${scale})`
     );
 
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(_pdfBuffer),
     });
-    
+
     const pdf = await loadingTask.promise;
-    
-    DocumentEngineLogger.info(`PDF loaded: ${pdf.numPages} pages`);
 
-    const imageBuffers: Buffer[] = [];
-    
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-  const page = await pdf.getPage(pageNumber);
-    const scale = options.scale ?? 3;
+    try {
+      DocumentEngineLogger.info(
+        `PDF loaded: ${pdf.numPages} pages`
+      );
 
-const viewport = page.getViewport({ scale });
-const { createCanvas } = await import("@napi-rs/canvas");
+      const imageBuffers: Buffer[] = [];
 
-const canvas = createCanvas(
-  Math.ceil(viewport.width),
-  Math.ceil(viewport.height)
-);
+      for (
+        let pageNumber = 1;
+        pageNumber <= pdf.numPages;
+        pageNumber++
+      ) {
+        const page = await pdf.getPage(pageNumber);
 
-const context = canvas.getContext("2d");
+        const viewport = page.getViewport({ scale });
 
-const renderContext: RenderParameters = {
-  canvas: null,
-  canvasContext: context as unknown as CanvasRenderingContext2D,
-  viewport,
-};
-await page.render(renderContext).promise;
+        const { createCanvas } = await import("@napi-rs/canvas");
 
-const imageBuffer = canvas.toBuffer("image/png");
+        const canvas = createCanvas(
+          Math.ceil(viewport.width),
+          Math.ceil(viewport.height)
+        );
 
-imageBuffers.push(imageBuffer);
+        const context = canvas.getContext("2d");
 
-DocumentEngineLogger.info(
-  `Rendered page ${pageNumber}/${pdf.numPages}`
-);
-}
+        const renderContext: RenderParameters = {
+          canvas: null,
+          canvasContext:
+            context as unknown as CanvasRenderingContext2D,
+          viewport,
+        };
 
-return imageBuffers;
+        await page.render(renderContext).promise;
+
+        const imageBuffer = canvas.toBuffer("image/png");
+
+        imageBuffers.push(imageBuffer);
+
+        DocumentEngineLogger.info(
+          `Rendered page ${pageNumber}/${pdf.numPages}`
+        );
+      }
+
+      return imageBuffers;
+    } finally {
+      await loadingTask.destroy();
+    }
   }
 }

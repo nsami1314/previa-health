@@ -26,28 +26,75 @@ import {
 } from "../types";
 
 import { isPdf } from "../mime";
+
 function extractTextItems(items: unknown[]): string {
-  return items
-    .map((item) => {
-      if (
+  const textItems = items
+    .filter(
+      (item): item is {
+        str: string;
+        transform: number[];
+      } =>
         typeof item === "object" &&
         item !== null &&
-        "str" in item
-      ) {
-        return String(
-          (item as { str: unknown }).str
-        );
-      }
+        "str" in item &&
+        "transform" in item &&
+        typeof (item as { str: unknown }).str === "string" &&
+        Array.isArray((item as { transform: unknown }).transform)
+    )
+    .map((item) => ({
+      text: item.str.trim(),
+      x: item.transform[4] ?? 0,
+      y: item.transform[5] ?? 0,
+    }))
+    .filter((item) => item.text.length > 0);
 
-      return "";
-    })
-    .join(" ");
+  const rows: {
+    y: number;
+    items: { text: string; x: number }[];
+  }[] = [];
+
+  for (const item of textItems) {
+    let row = rows.find(
+      (existingRow) => Math.abs(existingRow.y - item.y) < 3
+    );
+
+    if (!row) {
+      row = {
+        y: item.y,
+        items: [],
+      };
+
+      rows.push(row);
+    }
+
+    row.items.push({
+      text: item.text,
+      x: item.x,
+    });
+  }
+
+  rows.sort((a, b) => b.y - a.y);
+
+  return rows
+    .map((row) =>
+      row.items
+        .sort((a, b) => a.x - b.x)
+        .map((item) => item.text)
+        .join(" ")
+    )
+    .join("\n");
 }
 
 export class PdfParser implements DocumentParser {
   private readonly renderer = new PdfRenderer();
 
-private readonly ocr = new OCREngine();
+  private readonly ocr = new OCREngine();
+
+  private renderedPages: Buffer[] = [];
+
+  getRenderedPages(): Buffer[] {
+    return this.renderedPages;
+  }
 
   supports(file: File): boolean {
     return isPdf(file.type);
@@ -124,16 +171,16 @@ const shouldUseOCR =
       await file.arrayBuffer()
     );
   
-    const renderedPages =
+    this.renderedPages =
       await this.renderer.render(pdfBuffer);
   
     DocumentEngineLogger.info(
-      `Rendered ${renderedPages.length} page(s) for OCR`
+      `Rendered ${this.renderedPages.length} page(s) for OCR`
     );
   
     let ocrText = "";
 
-for (const page of renderedPages) {
+    for (const page of this.renderedPages) {
   const ocrResult =
     await this.ocr.recognize(page);
 

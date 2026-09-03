@@ -13,6 +13,152 @@ type HealthInsight = {
   created_at: string;
 };
 
+type TrendObservation = {
+  id: string;
+  medical_report_id: string;
+  observation_date: string | null;
+  test_name: string;
+  normalized_name: string | null;
+  value: number | null;
+  unit: string | null;
+  reference_range: string | null;
+  abnormal_flag: string | null;
+};
+
+type TrendSummary = {
+  name: string;
+  observations: TrendObservation[];
+  latest: TrendObservation | null;
+  previous: TrendObservation | null;
+  change: number | null;
+};
+
+type HealthOverview = {
+  summary: string;
+  keyChanges: TrendSummary[];
+};
+
+function TrendChart({
+  observations,
+}: {
+  observations: TrendObservation[];
+}) {
+  const validObservations = observations.filter(
+    (observation) =>
+      observation.value !== null &&
+      observation.observation_date !== null
+  );
+
+  if (validObservations.length < 2) {
+    return null;
+  }
+
+  const values = validObservations.map((observation) => observation.value!);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valueRange = maxValue - minValue;
+
+  const width = 320;
+  const height = 100;
+  const paddingX = 8;
+  const paddingY = 12;
+
+  const points = validObservations.map((observation, index) => {
+    const x =
+      paddingX +
+      (index / (validObservations.length - 1)) *
+        (width - paddingX * 2);
+
+    const y =
+      valueRange === 0
+        ? height / 2
+        : height -
+          paddingY -
+          ((observation.value! - minValue) / valueRange) *
+            (height - paddingY * 2);
+
+    return {
+      x,
+      y,
+      observation,
+    };
+  });
+
+  const path = points
+    .map((point, index) =>
+      index === 0
+        ? `M ${point.x} ${point.y}`
+        : `L ${point.x} ${point.y}`
+    )
+    .join(" ");
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Trend
+        </p>
+        <p className="text-xs text-zinc-400">
+          {validObservations.length} observations
+        </p>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white px-2 py-3">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-24 w-full"
+          role="img"
+          aria-label="Longitudinal health trend"
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={paddingX}
+            y1={height - paddingY}
+            x2={width - paddingX}
+            y2={height - paddingY}
+            stroke="currentColor"
+            className="text-zinc-200"
+            strokeWidth="1"
+          />
+
+          <path
+            d={path}
+            fill="none"
+            stroke="currentColor"
+            className="text-teal-600"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {points.map((point) => (
+            <circle
+              key={point.observation.id}
+              cx={point.x}
+              cy={point.y}
+              r="3.5"
+              fill="currentColor"
+              className="text-teal-600"
+            />
+          ))}
+        </svg>
+
+        <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-400">
+          <span>
+            {validObservations[0].observation_date}
+          </span>
+          <span>
+            {
+              validObservations[validObservations.length - 1]
+                .observation_date
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HealthInsightsPage() {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -29,6 +175,69 @@ export default function HealthInsightsPage() {
   const [editingInsight, setEditingInsight] =
     useState<HealthInsight | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [trendObservations, setTrendObservations] = useState<
+  TrendObservation[]
+>([]);
+
+const [trendSummaries, setTrendSummaries] = useState<
+TrendSummary[]
+>([]);
+const [healthChanges, setHealthChanges] = useState<TrendSummary[]>([]);
+const [healthOverview, setHealthOverview] =
+  useState<HealthOverview | null>(null);
+  const [healthOverviewLoading, setHealthOverviewLoading] =
+  useState(false);
+const [healthOverviewError, setHealthOverviewError] =
+  useState("");
+
+useEffect(() => {
+  async function loadTrendObservations() {
+    if (!user) {
+      return;
+    }
+
+    try {
+      const token = await getToken({ skipCache: true });
+
+      if (!token) {
+        console.error("No authentication token.");
+        return;
+      }
+
+      const supabase = createSupabaseClient(token);
+
+      const { data, error } = await supabase
+        .from("medical_observations")
+        .select(
+          "id, medical_report_id, observation_date, test_name, normalized_name, value, unit, reference_range, abnormal_flag"
+        )
+        .eq("user_id", user.id)
+        .order("observation_date", { ascending: true });
+
+      if (error) {
+        console.error(
+          "Health trend observations error:",
+          JSON.stringify(error, null, 2)
+        );
+        return;
+      }
+
+      setTrendObservations(data ?? []);
+
+      console.log(
+        "Health trend observations:",
+        JSON.stringify(data ?? [], null, 2)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load health trend observations:",
+        error
+      );
+    }
+  }
+
+  loadTrendObservations();
+}, [user, getToken]);
 
   useEffect(() => {
     async function loadInsights() {
@@ -70,6 +279,198 @@ export default function HealthInsightsPage() {
 
     loadInsights();
   }, [user, getToken]);
+
+  useEffect(() => {
+    if (trendObservations.length === 0) {
+      return;
+    }
+
+    const groupedTrends = trendObservations.reduce(
+      (groups, observation) => {
+        const key =
+          observation.normalized_name || observation.test_name;
+
+        if (!groups[key]) {
+          groups[key] = [];
+        }
+
+        groups[key].push(observation);
+
+        return groups;
+      },
+      {} as Record<
+        string,
+        typeof trendObservations
+      >
+    );
+
+    const trendSummaries = Object.entries(groupedTrends).map(
+      ([name, observations]) => {
+        const sortedObservations = [...observations].sort((a, b) => {
+          const dateA = a.observation_date || "";
+          const dateB = b.observation_date || "";
+
+          return dateA.localeCompare(dateB);
+        });
+
+        const latest =
+          sortedObservations[sortedObservations.length - 1] ?? null;
+
+        const previous =
+          sortedObservations.length > 1
+            ? sortedObservations[sortedObservations.length - 2]
+            : null;
+
+        const change =
+          latest?.value !== null &&
+          latest?.value !== undefined &&
+          previous?.value !== null &&
+          previous?.value !== undefined
+            ? latest.value - previous.value
+            : null;
+
+            return {
+              name,
+              observations: sortedObservations,
+              latest,
+              previous,
+              change,
+            };
+      }
+    );
+
+    setTrendSummaries(trendSummaries);
+    
+    console.log(
+      "Trend summaries:",
+      JSON.stringify(trendSummaries, null, 2)
+    );
+
+    console.log(
+      "Grouped health trends:",
+      JSON.stringify(groupedTrends, null, 2)
+    );
+  }, [trendObservations]);
+
+  useEffect(() => {
+    const changes = trendSummaries.filter(
+      (trend) =>
+        trend.latest !== null &&
+        trend.previous !== null &&
+        trend.change !== null &&
+        trend.change !== 0
+    );
+  
+    setHealthChanges(changes);
+
+    
+  }, [trendSummaries]);
+
+  const [healthOverviewRequestRef] = useState(() => ({
+    current: null as string | null,
+  }));
+  
+  useEffect(() => {
+    if (trendObservations.length === 0) {
+      healthOverviewRequestRef.current = null;
+      setHealthOverview(null);
+      return;
+    }
+  
+    if (trendSummaries.length === 0) {
+      return;
+    }
+  
+    const requestKey = JSON.stringify(
+      trendObservations.map((observation) => ({
+        id: observation.id,
+        observation_date: observation.observation_date,
+        normalized_name: observation.normalized_name,
+        test_name: observation.test_name,
+        value: observation.value,
+        unit: observation.unit,
+        reference_range: observation.reference_range,
+        abnormal_flag: observation.abnormal_flag,
+      }))
+    );
+  
+    if (healthOverviewRequestRef.current === requestKey) {
+      return;
+    }
+  
+    healthOverviewRequestRef.current = requestKey;
+  
+    const controller = new AbortController();
+    let isCurrentRequest = true;
+  
+    async function generateHealthOverview() {
+      try {
+        setHealthOverviewLoading(true);
+        setHealthOverviewError("");
+  
+        const response = await fetch("/api/ai/health-overview", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            observations: trendObservations,
+          }),
+        });
+  
+        const data = await response.json();
+  
+        if (!response.ok) {
+          throw new Error(
+            data?.error || "Failed to generate health overview."
+          );
+        }
+  
+        if (!isCurrentRequest) {
+          return;
+        }
+  
+        setHealthOverview({
+          summary: data.summary || "",
+          keyChanges: trendSummaries.filter(
+            (trend) =>
+              trend.latest !== null &&
+              trend.previous !== null &&
+              trend.change !== null &&
+              trend.change !== 0
+          ),
+        });
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+  
+        console.error("Health overview request failed:", error);
+  
+        if (isCurrentRequest) {
+          setHealthOverviewError(
+            "Unable to generate the AI health overview right now."
+          );
+        }
+      } finally {
+        if (isCurrentRequest) {
+          setHealthOverviewLoading(false);
+        }
+      }
+    }
+  
+    generateHealthOverview();
+  
+    return () => {
+      isCurrentRequest = false;
+      controller.abort();
+    
+      if (healthOverviewRequestRef.current === requestKey) {
+        healthOverviewRequestRef.current = null;
+      }
+    };
+  }, [trendObservations, trendSummaries, healthOverviewRequestRef]);
 
   function resetInsightForm() {
     setInsightTitle("");
@@ -258,6 +659,272 @@ export default function HealthInsightsPage() {
             Keep personal observations and learnings about your health.
           </p>
         </div>
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-900">
+              AI Health Overview
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              A high-level summary of what has changed across your
+              longitudinal health data.
+            </p>
+          </div>
+
+          {!healthOverview ? (
+            <div className="mt-5 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
+              <p className="text-sm text-zinc-600">
+                Your health overview will appear here once enough
+                longitudinal data is available.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+                <p className="text-sm leading-6 text-zinc-700">
+                  {healthOverview.summary}
+                </p>
+              </div>
+
+              {healthOverview.keyChanges.length > 0 && (
+                <div className="mt-5">
+                  <h3 className="text-sm font-semibold text-zinc-900">
+                    Key Changes
+                  </h3>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {healthOverview.keyChanges.map((trend) => {
+                      const change = trend.change!;
+                      const latest = trend.latest!;
+
+                      return (
+                        <div
+                          key={trend.name}
+                          className="rounded-xl border border-zinc-200 p-4"
+                        >
+                          <p className="text-sm font-medium text-zinc-900">
+                            {trend.name}
+                          </p>
+
+                          <p
+                            className={`mt-2 text-lg font-semibold ${
+                              change > 0
+                                ? "text-amber-600"
+                                : "text-emerald-600"
+                            }`}
+                          >
+                            {change > 0 ? "+" : ""}
+                            {Number(change.toFixed(2))}
+                            {latest.unit ? ` ${latest.unit}` : ""}
+                          </p>
+
+                          <p className="mt-1 text-xs text-zinc-500">
+                            Change from previous observation
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+                {/* Health Trends */}
+                <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold text-zinc-900">
+              Health Trends
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Previa tracks your medical observations over time to help you
+              understand how your health measurements are changing.
+            </p>
+          </div>
+
+          {trendSummaries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-5 py-8 text-center">
+              <p className="text-sm font-medium text-zinc-700">
+                No health trends available yet
+              </p>
+              <p className="mt-1 text-sm text-zinc-500">
+                Upload more medical reports with recurring test results to
+                build your longitudinal health trends.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {trendSummaries.map((trend) => {
+                const latest = trend.latest;
+                const previous = trend.previous;
+
+                return (
+                  <div
+                    key={trend.name}
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+                  >
+                    <div className="mb-3">
+                      <h3 className="font-medium text-zinc-900">
+                        {trend.name}
+                      </h3>
+                    </div>
+                    
+                    <TrendChart observations={trend.observations} />
+
+                    {latest ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                            Latest
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold text-zinc-900">
+                            {latest.value ?? "—"}{" "}
+                            <span className="text-sm font-normal text-zinc-500">
+                              {latest.unit ?? ""}
+                            </span>
+                          </p>
+                          {latest.observation_date && (
+                            <p className="mt-1 text-xs text-zinc-500">
+                              {new Date(
+                                latest.observation_date
+                              ).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+
+                        {previous && (
+                          <div className="border-t border-zinc-200 pt-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                                  Previous
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-zinc-700">
+                                  {previous.value ?? "—"}{" "}
+                                  {previous.unit ?? ""}
+                                </p>
+                              </div>
+
+                              {trend.change !== null && (
+                                <div className="text-right">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                                    Change
+                                  </p>
+                                  <p
+                                    className={`mt-1 text-sm font-semibold ${
+                                      trend.change > 0
+                                        ? "text-amber-600"
+                                        : trend.change < 0
+                                          ? "text-emerald-600"
+                                          : "text-zinc-600"
+                                    }`}
+                                  >
+                                    {trend.change > 0 ? "+" : ""}
+                                    {Number(trend.change.toFixed(2))}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500">
+                        No observation data available.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+  <div className="flex items-center justify-between gap-4">
+    <div>
+      <h2 className="text-xl font-semibold text-zinc-900">
+        What Changed?
+      </h2>
+      <p className="mt-1 text-sm text-zinc-500">
+        Changes detected between your latest and previous observations.
+      </p>
+    </div>
+
+    {healthChanges.length > 0 && (
+      <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
+        {healthChanges.length} changed
+      </span>
+    )}
+  </div>
+
+  {healthChanges.length === 0 ? (
+    <div className="mt-6 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-5">
+      <p className="text-sm text-zinc-600">
+      No changes detected yet.
+      </p>
+    </div>
+  ) : (
+    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {healthChanges.map((trend) => {
+        const change = trend.change!;
+        const latest = trend.latest!;
+        const previous = trend.previous!;
+
+        return (
+          <div
+            key={trend.name}
+            className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+          >
+            <p className="text-sm font-semibold text-zinc-900">
+              {trend.name}
+            </p>
+
+            <div className="mt-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs text-zinc-500">
+                  Previous
+                </p>
+                <p className="mt-1 text-lg font-medium text-zinc-700">
+                  {previous.value}
+                  {previous.unit ? ` ${previous.unit}` : ""}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-xs text-zinc-500">
+                  Latest
+                </p>
+                <p className="mt-1 text-lg font-semibold text-zinc-900">
+                  {latest.value}
+                  {latest.unit ? ` ${latest.unit}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-zinc-200 pt-3">
+              <p className="text-xs text-zinc-500">
+                Change
+              </p>
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  change > 0
+                    ? "text-amber-600"
+                    : "text-emerald-600"
+                }`}
+              >
+                {change > 0 ? "+" : ""}
+                {Number(change.toFixed(2))}
+                {latest.unit ? ` ${latest.unit}` : ""}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</section>
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">

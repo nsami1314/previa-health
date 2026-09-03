@@ -34,4 +34,7 @@ export class DocumentEngine {
 
     throw new Error("Unsupported document type.");
   }
+  getRenderedPages(): Buffer[] {
+    return this.pdfParser.getRenderedPages();
+  }
 }

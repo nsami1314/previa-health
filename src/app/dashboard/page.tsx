@@ -33,6 +33,7 @@ const { data: healthProfile } = await supabase
   .from("medical_reports")
   .select("id, original_file_name, report_type, report_date, uploaded_at")
   .eq("user_id", userId)
+  .order("report_date", { ascending: false, nullsFirst: false })
   .order("uploaded_at", { ascending: false })
   .limit(3);
 
@@ -85,6 +86,7 @@ const { data: healthProfile } = await supabase
         "id, original_file_name, report_type, report_date, uploaded_at"
       )
       .eq("user_id", userId)
+      .order("report_date", { ascending: false, nullsFirst: false })
       .order("uploaded_at", { ascending: false })
       .limit(5),
   ]);

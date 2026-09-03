@@ -67,6 +67,8 @@ const engineFile = new File(
 const parsedDocument =
   await documentEngine.process(engineFile);
 
+  const renderedPages = documentEngine.getRenderedPages();
+
 const extractedText = parsedDocument.text;
 
 console.log("====================================");
@@ -89,12 +91,58 @@ if (saveTextError) {
 }
 console.log("Sending report to OpenAI...");
 
-const aiResult = await analyzeMedicalReport(extractedText);
+const aiResult = await analyzeMedicalReport(
+  extractedText,
+  renderedPages
+);
+
+const labResults = Array.isArray(aiResult.lab_results)
+  ? aiResult.lab_results
+  : [];
+
+if (labResults.length > 0) {
+  const observations = labResults
+    .filter((result: any) => result.test_name)
+    .map((result: any) => ({
+      user_id: report.user_id,
+      medical_report_id: report.id,
+      observation_date: result.observation_date || aiResult.report_date || null,
+      test_name: result.test_name,
+      normalized_name: result.normalized_name || null,
+      value:
+        result.value !== null &&
+        result.value !== undefined &&
+        result.value !== ""
+          ? Number(result.value)
+          : null,
+      unit: result.unit || null,
+      reference_range: result.reference_range || null,
+      abnormal_flag: result.abnormal_flag || null,
+    }));
+
+  if (observations.length > 0) {
+    const { error: observationsError } = await supabaseAdmin
+      .from("medical_observations")
+      .insert(observations);
+
+    if (observationsError) {
+      console.error(
+        "Failed to save medical observations:",
+        observationsError
+      );
+    } else {
+      console.log(
+        `Saved ${observations.length} medical observation(s).`
+      );
+    }
+  }
+}
 
 const { error: reportTypeError } = await supabaseAdmin
   .from("medical_reports")
   .update({
     report_type: aiResult.report_type ?? "Other",
+    report_date: aiResult.report_date || null,
   })
   .eq("id", report.id);
 

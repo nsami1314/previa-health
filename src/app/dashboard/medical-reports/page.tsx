@@ -28,6 +28,7 @@ export default function MedicalReportsPage() {
     )
   `)
   .eq("user_id", user.id)
+  .order("report_date", { ascending: false, nullsFirst: false })
   .order("uploaded_at", { ascending: false });
 
       if (error) {
@@ -132,10 +133,11 @@ Hint: ${analysisError.hint}`
     setSelectedFile(null);
 
     const { data: refreshedReports } = await supabase
-      .from("medical_reports")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("uploaded_at", { ascending: false });
+  .from("medical_reports")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("report_date", { ascending: false, nullsFirst: false })
+  .order("uploaded_at", { ascending: false });
 
     setReports(refreshedReports ?? []);
   }
@@ -173,6 +175,7 @@ Hint: ${analysisError.hint}`
             }}
             className="mt-3 block w-full text-sm"
           />
+
 
           {selectedFile && (
             <div className="mt-4 rounded-lg bg-zinc-100 p-3">
@@ -212,9 +215,11 @@ Hint: ${analysisError.hint}`
                         </p>
 
                         <p className="mt-1 text-sm text-zinc-500">
-                          Uploaded:{" "}
-                          {new Date(report.uploaded_at).toLocaleString()}
-                        </p>
+  Report Date:{" "}
+  {report.report_date
+    ? new Date(report.report_date).toLocaleDateString()
+    : "Date not available"}
+</p>
                       </div>
 
                       <span className="shrink-0 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
