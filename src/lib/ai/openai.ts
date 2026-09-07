@@ -2,11 +2,20 @@ import OpenAI from "openai";
 import {
   HEALTH_OVERVIEW_PROMPT,
   REPORT_ANALYSIS_PROMPT,
+  INCREMENTAL_HEALTH_OVERVIEW_PROMPT,
 } from "./prompts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+type IncrementalHealthOverviewResult = {
+  summary: string;
+  key_changes: unknown[];
+  patterns: unknown[];
+  doctor_questions: unknown[];
+  confidence: number;
+};
 
 export async function analyzeMedicalReport(
   reportText: string,
@@ -90,4 +99,52 @@ export async function analyzeHealthOverview(
   });
 
   return JSON.parse(response.output_text);
+}
+
+export async function updateHealthOverviewIncrementally(
+  existingHealthState: unknown,
+  meaningfulChanges: unknown,
+  newObservations: unknown
+): Promise<IncrementalHealthOverviewResult> {
+  const response = await openai.responses.create({
+    model: "gpt-5",
+
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: INCREMENTAL_HEALTH_OVERVIEW_PROMPT,
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: JSON.stringify({
+              existing_health_state:
+                existingHealthState ?? {},
+              meaningful_changes:
+                meaningfulChanges ?? [],
+              new_observations:
+                newObservations ?? [],
+            }),
+          },
+        ],
+      },
+    ],
+
+    text: {
+      format: {
+        type: "json_object",
+      },
+    },
+  });
+
+  return JSON.parse(
+    response.output_text
+  ) as IncrementalHealthOverviewResult;
 }

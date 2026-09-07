@@ -366,111 +366,58 @@ useEffect(() => {
     
   }, [trendSummaries]);
 
-  const [healthOverviewRequestRef] = useState(() => ({
-    current: null as string | null,
-  }));
-  
   useEffect(() => {
-    if (trendObservations.length === 0) {
-      healthOverviewRequestRef.current = null;
-      setHealthOverview(null);
-      return;
-    }
-  
-    if (trendSummaries.length === 0) {
-      return;
-    }
-  
-    const requestKey = JSON.stringify(
-      trendObservations.map((observation) => ({
-        id: observation.id,
-        observation_date: observation.observation_date,
-        normalized_name: observation.normalized_name,
-        test_name: observation.test_name,
-        value: observation.value,
-        unit: observation.unit,
-        reference_range: observation.reference_range,
-        abnormal_flag: observation.abnormal_flag,
-      }))
-    );
-  
-    if (healthOverviewRequestRef.current === requestKey) {
-      return;
-    }
-  
-    healthOverviewRequestRef.current = requestKey;
-  
-    const controller = new AbortController();
-    let isCurrentRequest = true;
-  
-    async function generateHealthOverview() {
+    let cancelled = false;
+
+    async function loadHealthInsightsState() {
       try {
         setHealthOverviewLoading(true);
         setHealthOverviewError("");
-  
-        const response = await fetch("/api/ai/health-overview", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            observations: trendObservations,
-          }),
-        });
-  
-        const data = await response.json();
-  
+
+        const response = await fetch("/api/health-insights");
+
         if (!response.ok) {
-          throw new Error(
-            data?.error || "Failed to generate health overview."
-          );
+          throw new Error("Failed to load health insights");
         }
-  
-        if (!isCurrentRequest) {
+
+        const data = await response.json();
+
+        if (cancelled) {
           return;
         }
-  
+
         setHealthOverview({
-          summary: data.summary || "",
-          keyChanges: trendSummaries.filter(
-            (trend) =>
-              trend.latest !== null &&
-              trend.previous !== null &&
-              trend.change !== null &&
-              trend.change !== 0
-          ),
+          summary: data.healthState?.summary || "",
+          keyChanges: Array.isArray(data.healthState?.key_changes)
+            ? data.healthState.key_changes
+            : [],
         });
       } catch (error) {
-        if ((error as Error).name === "AbortError") {
+        if (cancelled) {
           return;
         }
-  
-        console.error("Health overview request failed:", error);
-  
-        if (isCurrentRequest) {
-          setHealthOverviewError(
-            "Unable to generate the AI health overview right now."
-          );
-        }
+
+        console.error(
+          "Health Insights state error:",
+          error
+        );
+
+        setHealthOverviewError(
+          "Unable to load the health overview right now."
+        );
       } finally {
-        if (isCurrentRequest) {
+        if (!cancelled) {
           setHealthOverviewLoading(false);
         }
       }
     }
-  
-    generateHealthOverview();
-  
+
+    loadHealthInsightsState();
+
     return () => {
-      isCurrentRequest = false;
-      controller.abort();
-    
-      if (healthOverviewRequestRef.current === requestKey) {
-        healthOverviewRequestRef.current = null;
-      }
+      cancelled = true;
     };
-  }, [trendObservations, trendSummaries, healthOverviewRequestRef]);
+  }, []);
 
   function resetInsightForm() {
     setInsightTitle("");
@@ -693,13 +640,13 @@ useEffect(() => {
                   </h3>
 
                   <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {healthOverview.keyChanges.map((trend) => {
-                      const change = trend.change!;
-                      const latest = trend.latest!;
+                  {healthOverview.keyChanges.map((trend, index) => {
+                      const change = trend.change;
+                      const latest = trend.latest;
 
                       return (
                         <div
-                          key={trend.name}
+                        key={`${trend.name}-${index}`}
                           className="rounded-xl border border-zinc-200 p-4"
                         >
                           <p className="text-sm font-medium text-zinc-900">
@@ -707,16 +654,24 @@ useEffect(() => {
                           </p>
 
                           <p
-                            className={`mt-2 text-lg font-semibold ${
-                              change > 0
-                                ? "text-amber-600"
-                                : "text-emerald-600"
-                            }`}
-                          >
-                            {change > 0 ? "+" : ""}
-                            {Number(change.toFixed(2))}
-                            {latest.unit ? ` ${latest.unit}` : ""}
-                          </p>
+  className={`mt-2 text-lg font-semibold ${
+    change !== null
+      ? change > 0
+        ? "text-amber-600"
+        : "text-emerald-600"
+      : "text-zinc-500"
+  }`}
+>
+  {change !== null ? (
+    <>
+      {change > 0 ? "+" : ""}
+      {Number(change.toFixed(2))}
+      {latest?.unit ? ` ${latest.unit}` : ""}
+    </>
+  ) : (
+    "No change data"
+  )}
+</p>
 
                           <p className="mt-1 text-xs text-zinc-500">
                             Change from previous observation
