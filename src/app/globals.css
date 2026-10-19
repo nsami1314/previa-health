@@ -1,49 +1,236 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* =========================================================
+     PREVIA — DESIGN TOKENS
+     ========================================================= */
+
+  /* Surfaces */
+  --background: #f6f8f7;
+  --surface: #ffffff;
+  --surface-subtle: #f9fbfa;
+  --surface-muted: #f2f5f4;
+
+  /* Typography */
+  --foreground: #17211f;
+  --foreground-secondary: #53615d;
+  --foreground-muted: #7a8783;
+  --foreground-subtle: #98a39f;
+
+  /* Borders */
+  --border: #e4e9e7;
+  --border-strong: #d7dfdc;
+
+  /* Primary — Previa teal */
+  --primary: #147d6f;
+  --primary-hover: #106d61;
+  --primary-soft: #e8f5f2;
+  --primary-subtle: #f1f9f7;
+
+  /* Informational */
+  --info: #3976a8;
+  --info-soft: #edf5fb;
+
+  /* Attention */
+  --attention: #a66b16;
+  --attention-soft: #fff7e8;
+
+  /* Critical */
+  --critical: #b54444;
+  --critical-soft: #fdf0f0;
+
+  /* Positive */
+  --success: #21785e;
+  --success-soft: #eaf6f1;
+
+  /* Focus */
+  --focus-ring: rgba(20, 125, 111, 0.22);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Shadows */
+  --shadow-card:
+    0 1px 2px rgba(18, 32, 28, 0.025),
+    0 4px 16px rgba(18, 32, 28, 0.025);
+
+  --shadow-card-hover:
+    0 2px 4px rgba(18, 32, 28, 0.035),
+    0 10px 28px rgba(18, 32, 28, 0.055);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  min-height: 100%;
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
-/* Global form control readability */
+/* =========================================================
+   FORM CONTROLS
+   ========================================================= */
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
 input,
 textarea,
 select {
-  color: #171717;
+  color: var(--foreground);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af;
+  color: var(--foreground-subtle);
   opacity: 1;
 }
 
 select option {
-  color: #171717;
+  color: var(--foreground);
 }
 
-/* Keep disabled controls readable while visually distinct */
 input:disabled,
 textarea:disabled,
 select:disabled {
-  color: #6b7280;
+  color: var(--foreground-muted);
+}
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d8dfdc transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #d8dfdc;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #c4cfca;
+}
+
+/* =========================================================
+   PREVIA SHARED SURFACE UTILITIES
+   ========================================================= */
+
+.previa-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.previa-card-interactive {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.previa-card-interactive:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.previa-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--border);
+}
+
+/* =========================================================
+   SEMANTIC STATUS UTILITIES
+   ========================================================= */
+
+.previa-status-stable {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.previa-status-improving {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.previa-status-attention {
+  color: var(--attention);
+  background: var(--attention-soft);
+}
+
+.previa-status-critical {
+  color: var(--critical);
+  background: var(--critical-soft);
+}
+
+.previa-status-info {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
+/* =========================================================
+   ACCESSIBILITY / REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* =========================================================
+   MOBILE BASELINE
+   ========================================================= */
+
+@media (max-width: 767px) {
+  body {
+    font-size: 14px;
+  }
 }

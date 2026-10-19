@@ -41,6 +41,36 @@ function areObservationsIdentical(
   );
 }
 
+/**
+ * Preserve previously stored entries while adding newly generated entries.
+ * Exact JSON deduplication avoids deleting historical findings just because
+ * the incremental model received a smaller context window.
+ */
+function mergeUniqueStateItems(
+  existingItems: unknown[],
+  updatedItems: unknown[]
+): unknown[] {
+  const merged: unknown[] = [];
+  const seen = new Set<string>();
+
+  for (const item of [...existingItems, ...updatedItems]) {
+    let key: string;
+
+    try {
+      key = JSON.stringify(item) ?? String(item);
+    } catch {
+      continue;
+    }
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  return merged;
+}
+
 async function claimHealthAIProcessing(
   userId: string,
   reportId: string
@@ -761,24 +791,55 @@ try {
       doctor_questions?: unknown[];
     };
 
-  const existingHealthStateForAI = {
-    summary:
-      existingState.summary ?? "",
-    key_changes:
-      Array.isArray(existingState.key_changes)
-        ? existingState.key_changes
-        : [],
-    patterns:
-      Array.isArray(existingState.patterns)
-        ? existingState.patterns
-        : [],
-    doctor_questions:
-      Array.isArray(
-        existingState.doctor_questions
-      )
-        ? existingState.doctor_questions
-        : [],
-  };
+  const storedKeyChanges = Array.isArray(existingState.key_changes)
+    ? existingState.key_changes
+    : [];
+  const storedPatterns = Array.isArray(existingState.patterns)
+    ? existingState.patterns
+    : [];
+  const storedDoctorQuestions = Array.isArray(existingState.doctor_questions)
+    ? existingState.doctor_questions
+    : [];
+
+  // Bound incremental-model context to avoid unbounded token growth. This
+  // affects only the context sent to the model: full key-change history remains
+  // stored and is merged back with the model's new suggestions below.
+  
+const existingHealthStateForAI = {
+  summary: existingState.summary ?? "",
+  key_changes: storedKeyChanges.slice(-8),
+  patterns: storedPatterns.slice(-8),
+  doctor_questions: storedDoctorQuestions.slice(-5),
+};
+
+const safeJsonLength = (value: unknown): number => {
+  try {
+    return JSON.stringify(value ?? null).length;
+  } catch {
+    return -1;
+  }
+};
+
+console.log("[INCREMENTAL AI INPUT AUDIT]", {
+  existingHealthStateCharacters:
+    safeJsonLength(existingHealthStateForAI),
+  meaningfulChangesCharacters:
+    safeJsonLength(meaningfulChanges),
+  newObservationsCharacters:
+    safeJsonLength(newObservationsForAI),
+  existingKeyChangesCount:
+    existingHealthStateForAI.key_changes.length,
+  storedKeyChangesCount:
+    storedKeyChanges.length,
+  existingPatternsCount:
+    existingHealthStateForAI.patterns.length,
+  existingDoctorQuestionsCount:
+    existingHealthStateForAI.doctor_questions.length,
+  newObservationsCount:
+    newObservationsForAI.length,
+  meaningfulChangesCount:
+    meaningfulChanges.length,
+});
 
   const incrementalResult =
     await updateHealthOverviewIncrementally(
@@ -801,26 +862,30 @@ try {
       ? incrementalResult.summary
       : existingHealthStateForAI.summary;
 
-  const keyChanges =
-    Array.isArray(
-      incrementalResult.key_changes
-    )
-      ? incrementalResult.key_changes
-      : existingHealthStateForAI.key_changes;
+  
+const generatedKeyChanges = Array.isArray(
+  incrementalResult.key_changes
+)
+  ? incrementalResult.key_changes
+  : [];
 
-  const patterns =
-    Array.isArray(
-      incrementalResult.patterns
-    )
-      ? incrementalResult.patterns
-      : existingHealthStateForAI.patterns;
+// Preserve historical key changes while avoiding exact duplicates.
+const keyChanges = mergeUniqueStateItems(
+  storedKeyChanges,
+  generatedKeyChanges
+);
 
-  const doctorQuestions =
-    Array.isArray(
-      incrementalResult.doctor_questions
-    )
-      ? incrementalResult.doctor_questions
-      : existingHealthStateForAI.doctor_questions;
+// Patterns and doctor questions are current, revisable state.
+// Use the model's reconciled output instead of re-adding every old item.
+const patterns = Array.isArray(incrementalResult.patterns)
+  ? incrementalResult.patterns
+  : [];
+
+const doctorQuestions = Array.isArray(
+  incrementalResult.doctor_questions
+)
+  ? incrementalResult.doctor_questions
+  : [];
 
   const confidence =
     typeof incrementalResult.confidence ===

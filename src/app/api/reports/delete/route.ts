@@ -1,17 +1,25 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: Request) {
   try {
-    const { reportId, userId } = await req.json();
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { reportId } = await req.json();
 
     console.log("=== DELETE REPORT ===");
     console.log("Report ID:", reportId);
-    console.log("User ID:", userId);
-
-    if (!reportId || !userId) {
+    if (!reportId) {
       return NextResponse.json(
-        { error: "Missing reportId or userId" },
+        { error: "Missing reportId" },
         { status: 400 }
       );
     }
