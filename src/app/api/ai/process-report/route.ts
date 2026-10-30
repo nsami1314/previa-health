@@ -1,8 +1,10 @@
 import { DocumentEngine } from "@/lib/document-engine";
+
 import {
   analyzeMedicalReport,
   updateHealthOverviewIncrementally,
 } from "@/lib/ai/openai";
+
 import { detectMeaningfulChanges } from "@/lib/health/change-engine";
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
@@ -529,6 +531,7 @@ if (saveTextError) {
 }
 console.log("Sending report to OpenAI...");
 
+
 const aiResult = await analyzeMedicalReport(
   extractedText,
   renderedPages
@@ -725,10 +728,7 @@ if (isDuplicateReport) {
           meaningfulChanges.length
         );
 
-        if (
-          meaningfulChanges.length > 0 &&
-          !isDuplicateReport
-        ) {
+        if (false) /* Incremental Health AI temporarily disabled */ {
           console.log(
             "Meaningful health changes detected:",
             meaningfulChanges
@@ -791,14 +791,14 @@ try {
       doctor_questions?: unknown[];
     };
 
-  const storedKeyChanges = Array.isArray(existingState.key_changes)
-    ? existingState.key_changes
+  const storedKeyChanges: unknown[] = Array.isArray(existingState.key_changes)
+    ? existingState.key_changes ?? []
     : [];
-  const storedPatterns = Array.isArray(existingState.patterns)
-    ? existingState.patterns
+  const storedPatterns: unknown[] = Array.isArray(existingState.patterns)
+    ? existingState.patterns ?? []
     : [];
-  const storedDoctorQuestions = Array.isArray(existingState.doctor_questions)
-    ? existingState.doctor_questions
+  const storedDoctorQuestions: unknown[] = Array.isArray(existingState.doctor_questions)
+    ? existingState.doctor_questions ?? []
     : [];
 
   // Bound incremental-model context to avoid unbounded token growth. This

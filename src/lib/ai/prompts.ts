@@ -6,6 +6,7 @@ IMPORTANT:
 - Never invent information.
 - Only use information present in the report.
 - If a section has no data, return an empty array.
+- Do not generate, include, or return doctor_questions, follow_up_tests, or recommendations.
 - Return ONLY valid JSON.
 - Do not include markdown or explanations.
 
@@ -13,6 +14,8 @@ Return exactly this JSON structure:
 {
   "report_type": "",
   "report_date": "",
+  "report_title": "",
+  "study_type": "",
   "summary": "",
   "diagnoses": [],
   "medications": [
@@ -37,9 +40,6 @@ Return exactly this JSON structure:
   "abnormal_findings": [],
   "normal_findings": [],
   "possible_conditions": [],
-  "doctor_questions": [],
-  "follow_up_tests": [],
-  "recommendations": [],
   "confidence": 0
 }
 
@@ -48,12 +48,19 @@ Rules:
 - Extract all laboratory values with units when available.
 - Separate normal and abnormal findings.
 - Possible conditions should only be listed if supported by the report.
-- Generate practical questions the patient can ask their doctor.
-- Suggest follow-up tests only if explicitly indicated or supported by the report.
 - Confidence must be a decimal number between 0 and 1.
 - report_type must be one of: "Laboratory Report", "Prescription", "Imaging / Scan", "Doctor Consultation", "Discharge Summary", or "Other".
 - Determine report_type only from information present in the uploaded document.
 - Never invent a report date or laboratory value.
+
+
+
+
+
+
+- report_title and study_type must describe only the uploaded document. Return an empty string if no explicit title or study type is present.
+- For CT, use study_type "CT" only when the document explicitly says CT, computed tomography, CAT scan, or CT angiogram.
+- For a carotid Doppler study, use study_type "Colour Doppler Carotids" only when the document itself explicitly supports both carotid anatomy and Doppler/duplex imaging. Never infer this from another report.
 
 Report date:
 - Prefer the date of the actual clinical event/test over upload or generation dates.
@@ -87,7 +94,6 @@ Return only valid JSON.
   "summary": "",
   "key_changes": [],
   "patterns": [],
-  "doctor_questions": [],
   "confidence": 0
 }
 
@@ -139,7 +145,6 @@ Return exactly this JSON structure:
   "summary": "",
   "key_changes": [],
   "patterns": [],
-  "doctor_questions": [],
   "confidence": 0
 }
 `;

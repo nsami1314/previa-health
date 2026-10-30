@@ -1,8 +1,9 @@
+
 /**
  * Previa Health
  * PDF Renderer
  *
- * Renders scanned PDF pages into PNG buffers for OCR
+ * Renders PDF pages into PNG buffers for OCR
  * and visual AI analysis.
  */
 
@@ -13,6 +14,7 @@ import { DocumentEngineLogger } from "../logger";
 
 export interface PdfRenderOptions {
   scale?: number;
+
 }
 
 export class PdfRenderer {
@@ -21,6 +23,7 @@ export class PdfRenderer {
     options: PdfRenderOptions = {}
   ): Promise<Buffer[]> {
     const scale = options.scale ?? 3;
+
 
     DocumentEngineLogger.info(
       `Rendering PDF pages (scale=${scale})`
@@ -45,7 +48,6 @@ export class PdfRenderer {
         pageNumber++
       ) {
         const page = await pdf.getPage(pageNumber);
-
         const viewport = page.getViewport({ scale });
 
         const { createCanvas } = await import("@napi-rs/canvas");
@@ -67,7 +69,6 @@ export class PdfRenderer {
         await page.render(renderContext).promise;
 
         const imageBuffer = canvas.toBuffer("image/png");
-
         imageBuffers.push(imageBuffer);
 
         DocumentEngineLogger.info(

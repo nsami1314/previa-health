@@ -1,3 +1,4 @@
+﻿
 /**
  * Previa Health
  * Document Engine
@@ -17,6 +18,7 @@ export class DocumentEngine {
 
   private readonly imageParser = new ImageParser();
 
+
   async process(file: File): Promise<ParsedDocument> {
     DocumentEngineLogger.info(
       `Starting document processing: ${file.name}`
@@ -34,6 +36,7 @@ export class DocumentEngine {
 
     throw new Error("Unsupported document type.");
   }
+
   getRenderedPages(): Buffer[] {
     return this.pdfParser.getRenderedPages();
   }

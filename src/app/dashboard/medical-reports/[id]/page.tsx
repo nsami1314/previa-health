@@ -100,6 +100,220 @@ if (medicationError) {
     loadReportDetails();
   }, [user, reportId, getToken]);
 
+  async function exportPreviaReport() {
+    if (!report || !analysis) {
+      window.alert("Processed report data is not available yet.");
+      return;
+    }
+
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+
+      const margin = 16;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - margin * 2;
+      let y = 18;
+
+      const aiResponse = analysis.ai_response ?? analysis.extracted_data ?? {};
+      const summary = String(analysis.ai_summary ?? aiResponse.summary ?? "").trim();
+      const possibleConditions = Array.isArray(aiResponse.possible_conditions)
+        ? aiResponse.possible_conditions.filter(
+            (item: unknown) => typeof item === "string" && item.trim()
+          )
+        : [];
+      const abnormalFindings = Array.isArray(aiResponse.abnormal_findings)
+        ? aiResponse.abnormal_findings.filter(
+            (item: unknown) => typeof item === "string" && item.trim()
+          )
+        : [];
+      const normalFindings = Array.isArray(aiResponse.normal_findings)
+        ? aiResponse.normal_findings.filter(
+            (item: unknown) => typeof item === "string" && item.trim()
+          )
+        : [];
+
+      const addPageIfNeeded = (height: number) => {
+        if (y + height <= pageHeight - 18) return;
+
+        pdf.addPage();
+        y = 18;
+        pdf.setDrawColor(228, 228, 231);
+        pdf.line(margin, y, pageWidth - margin, y);
+        y += 8;
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor(13, 116, 110);
+        pdf.text("Medical Report Summary — Continued", margin, y);
+        y += 9;
+      };
+
+      const addSection = (title: string, color: [number, number, number] = [13, 116, 110]) => {
+        addPageIfNeeded(16);
+        y += 2;
+        pdf.setFillColor(color[0], color[1], color[2]);
+        pdf.roundedRect(margin, y - 4, 3, 8, 1, 1, "F");
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.setTextColor(24, 24, 27);
+        pdf.text(title, margin + 7, y + 1);
+        y += 9;
+      };
+
+      const addParagraph = (value: string, fontSize = 9.5) => {
+        if (!value) return;
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(63, 63, 70);
+        const lines = pdf.splitTextToSize(value, contentWidth);
+        addPageIfNeeded(lines.length * 4.6 + 4);
+        pdf.text(lines, margin, y);
+        y += lines.length * 4.6 + 4;
+      };
+
+      const addList = (items: string[], color: [number, number, number]) => {
+        items.forEach((item) => {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9.2);
+          const lines = pdf.splitTextToSize(item, contentWidth - 8);
+          const itemHeight = Math.max(7, lines.length * 4.4 + 3);
+
+          addPageIfNeeded(itemHeight);
+
+          pdf.setFillColor(color[0], color[1], color[2]);
+          pdf.circle(margin + 2, y + 2.2, 1.1, "F");
+          pdf.setTextColor(63, 63, 70);
+          pdf.text(lines, margin + 6, y + 4);
+          y += itemHeight;
+        });
+
+        y += 2;
+      };
+
+      const addMetadata = (label: string, value: string) => {
+        if (!value) return;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(113, 113, 122);
+        pdf.text(label, margin, y);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(39, 39, 42);
+        const lines = pdf.splitTextToSize(value, contentWidth - 40);
+        const rowHeight = Math.max(5, lines.length * 4.2);
+        addPageIfNeeded(rowHeight + 2);
+        pdf.text(lines, margin + 38, y);
+        y += rowHeight + 2;
+      };
+
+      pdf.setFillColor(13, 116, 110);
+      pdf.rect(0, 0, pageWidth, 8, "F");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.setTextColor(24, 24, 27);
+      pdf.text("Previa Health", margin, y);
+      y += 8;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.setTextColor(82, 82, 91);
+      pdf.text("Medical Report Summary", margin, y);
+      y += 9;
+
+      pdf.setDrawColor(228, 228, 231);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 8;
+
+      addMetadata("Report", String(report.original_file_name ?? report.file_name ?? "Medical Report"));
+      addMetadata("Patient", String(user?.fullName ?? "Your Medical Report"));
+      addMetadata(
+        "Uploaded",
+        report.uploaded_at ? new Date(report.uploaded_at).toLocaleString() : "Not available"
+      );
+      addMetadata("Analysis status", String(analysis.status ?? "Not available"));
+
+      if (summary) {
+        addSection("Report Summary");
+        addParagraph(summary);
+      }
+
+      if (possibleConditions.length) {
+        addSection("Possible Conditions", [180, 83, 9]);
+        addList(possibleConditions, [217, 119, 6]);
+      }
+
+      if (
+        typeof aiResponse.confidence === "number" &&
+        Number.isFinite(aiResponse.confidence) &&
+        aiResponse.confidence >= 0 &&
+        aiResponse.confidence <= 1
+      ) {
+        addSection("AI Analysis Confidence");
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.setTextColor(24, 24, 27);
+        pdf.text(`${Math.round(aiResponse.confidence * 100)}%`, margin, y + 2);
+        y += 8;
+        pdf.setFillColor(228, 228, 231);
+        pdf.roundedRect(margin, y, contentWidth, 3, 1.5, 1.5, "F");
+        pdf.setFillColor(13, 148, 136);
+        pdf.roundedRect(
+          margin,
+          y,
+          contentWidth * aiResponse.confidence,
+          3,
+          1.5,
+          1.5,
+          "F"
+        );
+        y += 9;
+      }
+
+      if (abnormalFindings.length) {
+        addSection("Abnormal Findings", [180, 83, 9]);
+        addList(abnormalFindings, [217, 119, 6]);
+      }
+
+      if (normalFindings.length) {
+        addSection("Normal Findings");
+        addList(normalFindings, [13, 148, 136]);
+      }
+
+      const disclaimer =
+        "This AI-assisted report summary is for informational purposes only and does not replace advice from a qualified healthcare professional.";
+      addPageIfNeeded(15);
+      pdf.setDrawColor(228, 228, 231);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 6;
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.8);
+      pdf.setTextColor(113, 113, 122);
+      pdf.text(pdf.splitTextToSize(disclaimer, contentWidth), margin, y);
+
+      const pageCount = pdf.getNumberOfPages();
+      for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+        pdf.setPage(pageNumber);
+        pdf.setDrawColor(228, 228, 231);
+        pdf.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(113, 113, 122);
+        pdf.text("Previa Health • Confidential medical information", margin, pageHeight - 8);
+        pdf.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
+          align: "right",
+        });
+      }
+
+      pdf.save("Previa-Health-Medical-Report-Summary.pdf");
+    } catch (error) {
+      console.error("Failed to export Previa report:", error);
+      window.alert("The PDF could not be generated. Please try again.");
+    }
+  }
   async function deleteReport() {
     if (!user || !reportId) return;
   
@@ -187,7 +401,16 @@ if (medicationError) {
     }}
     className="text-sm font-medium text-teal-700 hover:text-teal-800"
   >
-    ← Back to Medical Reports
+    â† Back to Medical Reports
+  </button>
+
+  <button
+    type="button"
+    onClick={exportPreviaReport}
+    disabled={!analysis}
+    className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Export Previa Report
   </button>
 
   <button
@@ -293,39 +516,75 @@ if (medicationError) {
     </p>
   </section>
 )}
-
           {/* Diagnoses */}
-{aiResponse?.diagnoses?.length > 0 && (
-  <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-    <p className="text-sm font-medium text-teal-700">
-      Clinical context
-    </p>
+          {Array.isArray(aiResponse?.diagnoses) &&
+            aiResponse.diagnoses.length > 0 && (
+              <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-teal-700">Clinical context</p>
+                <h2 className="mt-1 text-xl font-semibold text-zinc-900">
+                  Diagnoses Mentioned in the Report
+                </h2>
+                <div className="mt-5 space-y-3">
+                  {aiResponse.diagnoses.map((diagnosis: string, index: number) => (
+                    <div key={index} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm leading-6 text-zinc-700">{diagnosis}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs leading-5 text-zinc-500">
+                  These are diagnoses or conditions mentioned in the report and are not necessarily confirmed diagnoses.
+                </p>
+              </section>
+            )}
 
-    <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-      Diagnoses / Conditions Mentioned
-    </h2>
+          {/* Possible Conditions */}
+          {Array.isArray(aiResponse?.possible_conditions) &&
+            aiResponse.possible_conditions.length > 0 && (
+              <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-amber-700">Interpret with care</p>
+                <h2 className="mt-1 text-xl font-semibold text-zinc-900">
+                  Possible Conditions
+                </h2>
+                <div className="mt-5 space-y-3">
+                  {aiResponse.possible_conditions.map((condition: string, index: number) => (
+                    <div key={index} className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+                      <p className="text-sm leading-6 text-zinc-700">{condition}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs leading-5 text-zinc-500">
+                  These are AI-generated possibilities, not confirmed diagnoses. Discuss relevant findings with a qualified healthcare professional.
+                </p>
+              </section>
+            )}
 
-    <div className="mt-5 space-y-3">
-      {aiResponse.diagnoses.map(
-        (diagnosis: string, index: number) => (
-          <div
-            key={index}
-            className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
-          >
-            <p className="text-sm leading-6 text-zinc-700">
-              {diagnosis}
-            </p>
-          </div>
-        )
-      )}
-    </div>
+          {/* AI Analysis Confidence */}
+          {typeof aiResponse?.confidence === "number" &&
+            Number.isFinite(aiResponse.confidence) &&
+            aiResponse.confidence >= 0 &&
+            aiResponse.confidence <= 1 && (
+              <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-teal-700">Analysis quality</p>
+                <h2 className="mt-1 text-xl font-semibold text-zinc-900">
+                  AI Analysis Confidence
+                </h2>
+                <div className="mt-4 flex items-center gap-4">
+                  <p className="text-3xl font-semibold text-zinc-900">
+                    {Math.round(aiResponse.confidence * 100)}%
+                  </p>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className="h-full rounded-full bg-teal-600"
+                      style={{ width: `${aiResponse.confidence * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">
+                  This is the confidence value reported by the AI. It is not the probability that you have a disease and does not replace clinical assessment.
+                </p>
+              </section>
+            )}
 
-    <p className="mt-4 text-xs leading-5 text-zinc-500">
-      These conditions are mentioned or identified in the report and are
-      not necessarily confirmed diagnoses.
-    </p>
-  </section>
-)}
 
           {/* Medications */}
 {medications.length > 0 && (
@@ -499,111 +758,6 @@ if (medicationError) {
         )
       )}
     </div>
-  </section>
-)}
-
-          {/* Doctor Questions */}
-{aiResponse?.doctor_questions?.length > 0 && (
-  <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-    <p className="text-sm font-medium text-teal-700">
-      Prepare for your appointment
-    </p>
-
-    <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-      Questions to Ask Your Doctor
-    </h2>
-
-    <div className="mt-5 space-y-3">
-      {aiResponse.doctor_questions.map(
-        (question: string, index: number) => (
-          <div
-            key={index}
-            className="flex gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4"
-          >
-            <span className="shrink-0 font-semibold text-teal-700">
-              {index + 1}.
-            </span>
-
-            <p className="text-sm leading-6 text-zinc-700">
-              {question}
-            </p>
-          </div>
-        )
-      )}
-    </div>
-
-    <p className="mt-4 text-xs leading-5 text-zinc-500">
-      These questions are intended to help you discuss your report with
-      your healthcare professional.
-    </p>
-  </section>
-)}
-
-          {/* Follow-up Tests */}
-{aiResponse?.follow_up_tests?.length > 0 && (
-  <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-    <p className="text-sm font-medium text-teal-700">
-      Recommended follow-up
-    </p>
-
-    <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-      Follow-up Tests
-    </h2>
-
-    <div className="mt-5 space-y-3">
-      {aiResponse.follow_up_tests.map(
-        (test: string, index: number) => (
-          <div
-            key={index}
-            className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
-          >
-            <p className="text-sm leading-6 text-zinc-700">
-              {test}
-            </p>
-          </div>
-        )
-      )}
-    </div>
-
-    <p className="mt-4 text-xs leading-5 text-zinc-500">
-      Follow-up tests shown here are based on information available in
-      the report. Discuss whether they are appropriate for you with your
-      healthcare professional.
-    </p>
-  </section>
-)}
-
-          {/* Recommendations */}
-{aiResponse?.recommendations?.length > 0 && (
-  <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-    <p className="text-sm font-medium text-teal-700">
-      Suggested next steps
-    </p>
-
-    <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-      Recommendations
-    </h2>
-
-    <div className="mt-5 space-y-3">
-      {aiResponse.recommendations.map(
-        (recommendation: string, index: number) => (
-          <div
-            key={index}
-            className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
-          >
-            <p className="text-sm leading-6 text-zinc-700">
-              {recommendation}
-            </p>
-          </div>
-        )
-      )}
-    </div>
-
-    <p className="mt-4 text-xs leading-5 text-zinc-500">
-      These suggestions are generated from the available report
-      information and are not a substitute for personalized medical
-      advice.
-    </p>
   </section>
 )}
 

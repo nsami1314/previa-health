@@ -137,7 +137,56 @@ export async function analyzeMedicalReport(
     response.usage
   );
 
-  return JSON.parse(response.output_text);
+  const result = JSON.parse(response.output_text);
+
+  const expectedFields = [
+    "report_type",
+    "report_date",
+    "summary",
+    "diagnoses",
+    "medications",
+    "lab_results",
+    "abnormal_findings",
+    "normal_findings",
+    "possible_conditions",
+    "confidence",
+  ];
+
+  const returnedKeys = Object.keys(result);
+  const fieldDiagnostics = Object.fromEntries(
+    returnedKeys.map((key) => {
+      const value = result[key];
+      const isArray = Array.isArray(value);
+
+      return [
+        key,
+        {
+          type: value === null ? "null" : isArray ? "array" : typeof value,
+          expected: expectedFields.includes(key),
+          serialized_characters: JSON.stringify(value).length,
+          ...(isArray ? { item_count: value.length } : {}),
+        },
+      ];
+    })
+  );
+
+  console.info("[AI DIAGNOSTICS] Medical Report Response Structure", {
+    returned_keys: returnedKeys,
+    missing_expected_fields: expectedFields.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(result, key)
+    ),
+    unexpected_fields: returnedKeys.filter(
+      (key) => !expectedFields.includes(key)
+    ),
+    fields: fieldDiagnostics,
+    excluded_fields_present: {
+      doctor_questions: Object.prototype.hasOwnProperty.call(result, "doctor_questions"),
+      follow_up_tests: Object.prototype.hasOwnProperty.call(result, "follow_up_tests"),
+      recommendations: Object.prototype.hasOwnProperty.call(result, "recommendations"),
+    },
+  });
+
+  return result;
 }
 
 export async function analyzeHealthOverview(observations: unknown) {
@@ -179,7 +228,56 @@ export async function analyzeHealthOverview(observations: unknown) {
     response.usage
   );
 
-  return JSON.parse(response.output_text);
+  const result = JSON.parse(response.output_text);
+
+  const expectedFields = [
+    "report_type",
+    "report_date",
+    "summary",
+    "diagnoses",
+    "medications",
+    "lab_results",
+    "abnormal_findings",
+    "normal_findings",
+    "possible_conditions",
+    "confidence",
+  ];
+
+  const returnedKeys = Object.keys(result);
+  const fieldDiagnostics = Object.fromEntries(
+    returnedKeys.map((key) => {
+      const value = result[key];
+      const isArray = Array.isArray(value);
+
+      return [
+        key,
+        {
+          type: value === null ? "null" : isArray ? "array" : typeof value,
+          expected: expectedFields.includes(key),
+          serialized_characters: JSON.stringify(value).length,
+          ...(isArray ? { item_count: value.length } : {}),
+        },
+      ];
+    })
+  );
+
+  console.info("[AI DIAGNOSTICS] Medical Report Response Structure", {
+    returned_keys: returnedKeys,
+    missing_expected_fields: expectedFields.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(result, key)
+    ),
+    unexpected_fields: returnedKeys.filter(
+      (key) => !expectedFields.includes(key)
+    ),
+    fields: fieldDiagnostics,
+    excluded_fields_present: {
+      doctor_questions: Object.prototype.hasOwnProperty.call(result, "doctor_questions"),
+      follow_up_tests: Object.prototype.hasOwnProperty.call(result, "follow_up_tests"),
+      recommendations: Object.prototype.hasOwnProperty.call(result, "recommendations"),
+    },
+  });
+
+  return result;
 }
 
 export async function updateHealthOverviewIncrementally(

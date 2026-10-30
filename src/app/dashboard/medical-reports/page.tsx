@@ -143,6 +143,141 @@ function getReportTypeLabel(
   return raw ? "Other" : "Unclassified";
 }
 
+function getReportAnalysisData(reportAnalysis: any) {
+  return Array.isArray(reportAnalysis)
+    ? reportAnalysis[0]?.extracted_data
+    : reportAnalysis?.extracted_data;
+}
+
+function normalizeIdentityPart(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/&/g, "-AND-")
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+}
+
+function getReportPanelCodes(report: any): string[] {
+  const aiData = getReportAnalysisData(report.report_analysis);
+  const labResults = Array.isArray(aiData?.lab_results) ? aiData.lab_results : [];
+  const testNames = Array.from(new Set<string>(
+    labResults
+      .map((result: any) => typeof result?.test_name === "string" ? result.test_name.trim() : "")
+      .filter((name: string) => Boolean(name))
+  ));
+  const tests = testNames.join(" | ").toLowerCase();
+  const panels: string[] = [];
+  const add = (code: string) => { if (!panels.includes(code)) panels.push(code); };
+
+  // Only classify panels from this report's own extracted test names.
+  if (/\bcbc\b|complete blood count/.test(tests) ||
+      ["haemoglobin", "hemoglobin", "rbc", "wbc", "pcv", "platelet", "mcv", "mch"].filter((marker) => tests.includes(marker)).length >= 3) {
+    add("CBC");
+  }
+  if (/thyroid profile|thyroid function|\btsh\b|\bfree t3\b|\bfree t4\b|\bt3\b|\bt4\b/.test(tests)) {
+    add("THYROID-PROFILE");
+  }
+  // TPO is a separate investigation and must be explicitly present in test names.
+  if (/\banti[- ]?tpo\b|tpo\)?\s*antibod|thyroid peroxidase antibody|microsomal.{0,20}tpo|tpo.{0,20}microsomal/.test(tests)) {
+    add("TPO-ANTIBODY");
+  }
+  if (/urine routine|urinalysis|urine analysis|urine examination|urine r\/e|urine culture/.test(tests)) {
+    add("URINE");
+  }
+  if (/\blft\b|liver function|sgot|sgpt|alanine aminotransferase|aspartate aminotransferase|bilirubin/.test(tests)) {
+    add("LFT");
+  }
+  if (/\brft\b|renal function|kidney function|serum creatinine|blood urea|\begfr\b/.test(tests)) {
+    add("RFT");
+  }
+  if (/lipid profile|total cholesterol|hdl cholesterol|ldl cholesterol|triglyceride/.test(tests)) {
+    add("LIPID-PROFILE");
+  }
+  if (/\bhba1c\b|glycated haemoglobin|glycated hemoglobin/.test(tests)) {
+    add("HBA1C");
+  }
+  if (/fasting blood sugar|fasting glucose|random blood sugar|blood glucose|serum glucose/.test(tests)) {
+    add("GLUCOSE");
+  }
+  if (/electrolyte|serum sodium|serum potassium|serum chloride/.test(tests)) {
+    add("ELECTROLYTES");
+  }
+  if (/vitamin d|25-oh vitamin d|vitamin b12/.test(tests)) {
+    add("VITAMIN-PROFILE");
+  }
+  if (/\becg\b|electrocardiogram/.test(tests)) add("ECG");
+
+  // If common panels cannot be confidently mapped, use the first explicit test
+  // names from this report rather than inventing a clinical panel.
+  if (panels.length === 0 && testNames.length > 0) {
+    for (const name of testNames.slice(0, 3)) {
+      const code = normalizeIdentityPart(name);
+      if (code && !panels.includes(code)) panels.push(code);
+    }
+  }
+
+  // Explicit AI titles are a last-resort source only when no lab test names exist.
+  if (panels.length === 0 && testNames.length === 0) {
+    const explicitTitle = [
+      aiData?.report_title,
+      aiData?.investigation_name,
+      aiData?.procedure_name,
+      aiData?.document_title,
+      aiData?.title,
+    ].find((value) => typeof value === "string" && value.trim().length > 2 &&
+      !["laboratory", "lab", "medical report", "report", "other"].includes(value.trim().toLowerCase()));
+    if (typeof explicitTitle === "string") {
+      const normalized = normalizeIdentityPart(explicitTitle);
+      if (normalized) panels.push(normalized.slice(0, 40));
+    }
+  }
+
+  return panels;
+}
+
+function getReportPanelDescription(report: any): string | null {
+  const panels = getReportPanelCodes(report);
+  if (panels.length === 0) return null;
+
+  const labels: Record<string, string> = {
+    CBC: "CBC",
+    "THYROID-PROFILE": "Thyroid Profile",
+    "TPO-ANTIBODY": "TPO Antibody",
+    URINE: "Urine Analysis",
+    LFT: "Liver Function (LFT)",
+    RFT: "Renal Function (RFT)",
+    "LIPID-PROFILE": "Lipid Profile",
+    HBA1C: "HbA1c",
+    GLUCOSE: "Glucose Tests",
+    ELECTROLYTES: "Electrolytes",
+    "VITAMIN-PROFILE": "Vitamin Tests",
+    ECG: "ECG",
+  };
+
+  return panels.map((panel) => labels[panel] ?? panel.replace(/-/g, " ")).join(" · ");
+}
+
+function getReportSearchText(report: any): string {
+  const aiData = getReportAnalysisData(report.report_analysis);
+  const labResults = Array.isArray(aiData?.lab_results) ? aiData.lab_results : [];
+  return [
+    report.original_file_name,
+    report.report_type,
+    getReportTypeLabel(report.report_type, report.report_analysis),
+    aiData?.summary,
+    aiData?.report_title,
+    aiData?.title,
+    aiData?.investigation_name,
+    ...labResults.map((result: any) => result?.test_name),
+  ]
+    .filter((value) => typeof value === "string" && value.trim())
+    .join(" ")
+    .toLowerCase();
+}
+
 export default function MedicalReportsPage() {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -152,6 +287,7 @@ export default function MedicalReportsPage() {
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("All");
+  const [sortOrder, setSortOrder] = useState("report-date-desc");
 
   async function loadReports() {
     if (!user) return;
@@ -331,29 +467,30 @@ const supabase = createSupabaseClient(token);
     const query = searchQuery.trim().toLowerCase();
 
     return reports.filter((report) => {
-      const typeLabel = getReportTypeLabel(
-        report.report_type,
-        report.report_analysis
-      )
-
-      const matchesType =
-        selectedType === "All" || typeLabel === selectedType;
-
-      const searchableText = [
-        report.original_file_name,
-        report.report_type,
-        typeLabel,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      const matchesSearch =
-        !query || searchableText.includes(query);
-
+      const typeLabel = getReportTypeLabel(report.report_type, report.report_analysis);
+      const matchesType = selectedType === "All" || typeLabel === selectedType;
+      const matchesSearch = !query || getReportSearchText(report).includes(query);
       return matchesType && matchesSearch;
+    }).sort((a, b) => {
+      const aReportDate = a.report_date ? new Date(a.report_date).getTime() : null;
+      const bReportDate = b.report_date ? new Date(b.report_date).getTime() : null;
+      const aUploadDate = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+      const bUploadDate = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+
+      if (sortOrder === "title-asc") return (a.original_file_name ?? "").localeCompare(b.original_file_name ?? "");
+      if (sortOrder === "uploaded-desc") return bUploadDate - aUploadDate;
+      if (sortOrder === "report-date-asc") {
+        if (aReportDate === null) return 1;
+        if (bReportDate === null) return -1;
+        return aReportDate - bReportDate;
+      }
+      // Default: newest report date first; missing dates stay at the bottom.
+      if (aReportDate === null && bReportDate === null) return bUploadDate - aUploadDate;
+      if (aReportDate === null) return 1;
+      if (bReportDate === null) return -1;
+      return (bReportDate - aReportDate) || (bUploadDate - aUploadDate);
     });
-  }, [reports, searchQuery, selectedType]);
+  }, [reports, searchQuery, selectedType, sortOrder]);
 
   const reportTypeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -445,17 +582,13 @@ const supabase = createSupabaseClient(token);
     </button>
   </div>
 )}
-            <div className="mt-4 rounded-lg bg-zinc-100 p-3">
-             
-            </div>
-          )
         </div>
 
         {/* Reports */}
         {reports.length > 0 && (
           <div className="mt-8">
 
-            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-900">
                   Your Reports
@@ -466,15 +599,30 @@ const supabase = createSupabaseClient(token);
                 </p>
               </div>
 
-              {/* Search */}
-              <div className="w-full sm:max-w-xs">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search reports..."
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                />
+              <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_13rem] lg:w-auto lg:min-w-[27rem]">
+                <div className="w-full min-w-0">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search test, lab or filename..."
+                    aria-label="Search medical reports"
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </div>
+                <div className="w-full min-w-0">
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    aria-label="Sort medical reports"
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  >
+                    <option value="report-date-desc">Report date: newest</option>
+                    <option value="report-date-asc">Report date: oldest</option>
+                    <option value="uploaded-desc">Recently uploaded</option>
+                    <option value="title-asc">Report name: A–Z</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -538,16 +686,20 @@ const supabase = createSupabaseClient(token);
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-zinc-900">
-                            {report.original_file_name}
+                          <p className="font-semibold text-zinc-900">
+                            {report.original_file_name ?? "Untitled report"}
                           </p>
 
+                          {getReportPanelDescription(report) && (
+                            <p className="mt-1 text-sm text-zinc-600">
+                              Investigations: {getReportPanelDescription(report)}
+                            </p>
+                          )}
+
                           <p className="mt-1 text-sm text-zinc-500">
-                            Report Date:{" "}
+                            Report date: {" "}
                             {report.report_date
-                              ? new Date(
-                                  report.report_date
-                                ).toLocaleDateString()
+                              ? new Date(report.report_date).toLocaleDateString()
                               : "Date not available"}
                           </p>
                         </div>
@@ -603,6 +755,7 @@ const supabase = createSupabaseClient(token);
                   onClick={() => {
                     setSearchQuery("");
                     setSelectedType("All");
+                    setSortOrder("report-date-desc");
                   }}
                   className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
                 >

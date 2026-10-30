@@ -101,7 +101,9 @@ export class PdfParser implements DocumentParser {
   }
 
   async parse(file: File): Promise<ParsedDocument> {
-    DocumentEngineLogger.info(
+
+    this.renderedPages = [];
+DocumentEngineLogger.info(
       `Parsing digital PDF: ${file.name}`
     );
 
